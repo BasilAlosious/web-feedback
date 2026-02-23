@@ -1,0 +1,60 @@
+{
+  "projects": [
+    {
+      "id": "r8k4pn",
+      "name": "Share Test Project",
+      "url": "http://example.com",
+      "markupCount": 2,
+      "updatedAt": "Just now"
+    }
+  ],
+  "markups": [
+    {
+      "id": "410ng",
+      "projectId": "r8k4pn",
+      "name": "homepage",
+      "url": "https://basenine.webflow.io/",
+      "viewport": "desktop",
+      "commentCount": 3,
+      "type": "website"
+    },
+    {
+      "id": "ifcila",
+      "projectId": "r8k4pn",
+      "name": "Share Test Page",
+      "url": "http://example.com",
+      "viewport": "desktop",
+      "commentCount": 0,
+      "type": "website"
+    }
+  ],
+  "comments": [
+    {
+      "id": "uq8rp",
+      "markupId": "410ng",
+      "x": 36.187497239113064,
+      "y": 47.953052796697996,
+      "content": "needs to change",
+      "author": "Agency User",
+      "createdAt": "2026-02-13T22:16:17.468Z"
+    },
+    {
+      "id": "3jrips",
+      "markupId": "410ng",
+      "x": 19.742646615810468,
+      "y": 91.01790068659606,
+      "content": "change the image",
+      "author": "Agency User",
+      "createdAt": "2026-02-13T22:16:57.821Z"
+    },
+    {
+      "id": "c0c7g8",
+      "markupId": "410ng",
+      "x": 48.253675387804925,
+      "y": 48.76751800501758,
+      "content": "not nice",
+      "author": "Agency User",
+      "createdAt": "2026-02-13T22:19:31.481Z"
+    }
+  ]
+}
