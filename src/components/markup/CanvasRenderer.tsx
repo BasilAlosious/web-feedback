@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState, useEffect } from "react"
+import { useRef } from "react"
 import { cn } from "@/lib/utils"
 
 interface CanvasRendererProps {
@@ -10,7 +10,6 @@ interface CanvasRendererProps {
 }
 
 export function CanvasRenderer({ imageUrl, mode, onCommentClick }: CanvasRendererProps) {
-    const containerRef = useRef<HTMLDivElement>(null)
     const imageRef = useRef<HTMLImageElement>(null)
 
     const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -28,11 +27,10 @@ export function CanvasRenderer({ imageUrl, mode, onCommentClick }: CanvasRendere
     }
 
     return (
-        <div className="flex-1 overflow-auto bg-muted/20 flex flex-col items-center py-8">
+        <div className="absolute inset-0 overflow-auto bg-muted/20 flex items-start justify-center p-4">
             <div
-                ref={containerRef}
                 className={cn(
-                    "relative shadow-2xl transition-all duration-300 bg-background",
+                    "relative bg-background shadow-lg",
                     mode === "comment" ? "cursor-crosshair" : "cursor-default"
                 )}
                 onClick={handleImageClick}
@@ -45,8 +43,6 @@ export function CanvasRenderer({ imageUrl, mode, onCommentClick }: CanvasRendere
                     className="max-w-full h-auto block select-none"
                     draggable={false}
                 />
-
-                {/* Render comments/overlays here later */}
 
                 {mode === "comment" && (
                     <div className="absolute inset-0 z-10 bg-transparent" />

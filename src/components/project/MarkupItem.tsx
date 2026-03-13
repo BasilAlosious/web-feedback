@@ -1,20 +1,5 @@
 import Link from "next/link"
-import { MoreHorizontal, ExternalLink, Monitor, Smartphone, Tablet } from "lucide-react"
-import {
-    Card,
-    CardContent,
-    CardFooter,
-    CardHeader,
-    CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
+import { Monitor, Smartphone, Tablet } from "lucide-react"
 
 interface MarkupItemProps {
     id: string
@@ -27,65 +12,63 @@ interface MarkupItemProps {
     type?: "website" | "image"
 }
 
-export function MarkupItem({ id, projectId, name, url, viewport, commentCount, type }: MarkupItemProps) {
+export function MarkupItem({ id, name, url, viewport, commentCount, type }: MarkupItemProps) {
     const Icon = viewport === "mobile" ? Smartphone : viewport === "tablet" ? Tablet : Monitor
 
+    // Status based on comment count
+    const status = commentCount === 0 ? "new" : commentCount < 5 ? "open" : "active"
+    const statusLabels = {
+        new: "NEW",
+        open: "OPEN",
+        active: "ACTIVE"
+    }
+
     return (
-        <Card className="flex flex-col overflow-hidden group hover:shadow-lg transition-all duration-300">
-            <div className="relative aspect-video w-full bg-muted/50 overflow-hidden">
-                {type === "image" || url.startsWith("blob:") ? (
+        <Link
+            href={`/markup/${id}`}
+            className="list-row grid-cols-[auto_1fr_100px_80px_60px] group"
+        >
+            {/* Thumbnail */}
+            <div className="w-16 h-10 border border-border overflow-hidden flex-shrink-0">
+                {type === "image" || url.startsWith("data:") || url.startsWith("blob:") ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                         src={url}
                         alt={name}
-                        className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+                        className="h-full w-full object-cover object-top"
                     />
                 ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-muted">
-                        <span className="text-sm">No Preview</span>
+                    <div className="h-full w-full flex items-center justify-center bg-muted text-muted-foreground">
+                        <Icon className="h-4 w-4" />
                     </div>
                 )}
-                <div className="absolute top-2 right-2">
-                    <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-                        <Icon className="h-3 w-3 mr-1" />
-                        {viewport}
-                    </Badge>
-                </div>
             </div>
-            <CardHeader className="p-4 pb-2">
-                <div className="flex items-start justify-between space-y-0">
-                    <div className="space-y-1">
-                        <CardTitle className="text-sm font-medium leading-none">
-                            <Link href={`/markup/${id}`} className="hover:underline">
-                                {name}
-                            </Link>
-                        </CardTitle>
-                        <p className="text-xs text-muted-foreground line-clamp-1">{url}</p>
-                    </div>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="-mr-2 h-6 w-6 text-muted-foreground">
-                                <MoreHorizontal className="h-3 w-3" />
-                                <span className="sr-only">Menu</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            </CardHeader>
-            <CardFooter className="p-4 pt-2 flex items-center justify-between">
-                <div className="text-xs text-muted-foreground">
-                    {commentCount} comments
-                </div>
-                <Button variant="ghost" size="sm" asChild className="h-7 text-xs">
-                    <Link href={`/markup/${id}`}>
-                        View <ExternalLink className="ml-2 h-3 w-3" />
-                    </Link>
-                </Button>
-            </CardFooter>
-        </Card>
+
+            {/* Name & URL */}
+            <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="font-medium text-foreground group-hover:text-accent transition-colors truncate">
+                    {name}
+                </span>
+                <span className="text-xs text-muted-foreground font-mono truncate">
+                    {type === "image" ? "Uploaded image" : url}
+                </span>
+            </div>
+
+            {/* Status Badge */}
+            <span className="status-badge justify-self-center">
+                {statusLabels[status]}
+            </span>
+
+            {/* Viewport */}
+            <span className="font-mono text-xs text-muted-foreground flex items-center gap-1">
+                <Icon className="h-3 w-3" />
+                {viewport}
+            </span>
+
+            {/* Comment Count */}
+            <span className="font-mono text-xs text-muted-foreground text-right">
+                {commentCount}
+            </span>
+        </Link>
     )
 }

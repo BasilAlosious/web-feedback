@@ -1,12 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Comment, store } from "@/lib/store"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Button } from "@/components/ui/button"
-import { X, MessageSquare, Send } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { Comment } from "@/lib/store"
 
 interface CommentThreadProps {
     markupId: string
@@ -24,61 +19,107 @@ export function CommentThread({ markupId, comments, onClose, onAddComment }: Com
         setInputValue("")
     }
 
+    const formatTime = (dateString: string) => {
+        const date = new Date(dateString)
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+
+    const formatDate = (dateString: string) => {
+        const date = new Date(dateString)
+        return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+    }
+
     return (
-        <div className="flex h-full w-80 flex-col border-l bg-background shadow-xl transition-all animate-in slide-in-from-right">
-            <div className="flex items-center justify-between border-b p-4">
-                <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    <h3 className="font-semibold">Comments ({comments.length})</h3>
-                </div>
-                <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
-                    <X className="h-4 w-4" />
-                </Button>
+        <div className="detail-panel w-80 border-l border-border h-full">
+            {/* Header */}
+            <div className="detail-header">
+                <span className="slash-label">Comments</span>
+                <button onClick={onClose} className="nav-item">
+                    <span className="text-foreground">[×]</span> Close
+                </button>
             </div>
 
-            <ScrollArea className="flex-1 p-4">
-                <div className="flex flex-col gap-6">
-                    {comments.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
-                            <MessageSquare className="h-8 w-8 mb-2 opacity-50" />
-                            <p>No comments yet.</p>
-                            <p className="text-sm">Click anywhere on the screen to add one.</p>
+            {/* Comments List */}
+            <div className="flex-1 overflow-y-auto">
+                {comments.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-center p-6">
+                        <div className="status-widget w-32 h-20 mb-4">
+                            <div className="status-widget-header">[ EMPTY ]</div>
                         </div>
-                    ) : (
-                        comments.map((comment, i) => (
-                            <div key={comment.id} className="flex gap-3 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${i * 50}ms` }}>
-                                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                                    {i + 1}
-                                </div>
-                                <div className="flex flex-col gap-1 w-full">
+                        <p className="font-mono text-xs text-muted-foreground uppercase">
+                            No comments yet.
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground mt-1">
+                            Click anywhere to add one.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col">
+                        {comments.map((comment, i) => (
+                            <div
+                                key={comment.id}
+                                className="p-4 border-b border-border-light hover:bg-muted/30 transition-colors cursor-pointer"
+                            >
+                                {/* Comment Header */}
+                                <div className="flex items-center justify-between mb-2">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold">{comment.author}</span>
-                                        <span className="text-xs text-muted-foreground">{new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                        <span className="pin-marker w-6 h-6 text-xs">
+                                            {i + 1}
+                                        </span>
+                                        <span className="font-mono text-xs font-medium">
+                                            {comment.author}
+                                        </span>
                                     </div>
-                                    <p className="text-sm text-foreground bg-muted/50 p-2 rounded-md">{comment.content}</p>
+                                    <span className="font-mono text-xs text-muted-foreground">
+                                        {formatTime(comment.createdAt)}
+                                    </span>
+                                </div>
+
+                                {/* Comment Content */}
+                                <p className="text-sm text-foreground pl-8">
+                                    {comment.content}
+                                </p>
+
+                                {/* Comment Meta */}
+                                <div className="flex items-center gap-4 mt-3 pl-8">
+                                    <span className="font-mono text-xs text-muted-foreground">
+                                        {formatDate(comment.createdAt)}
+                                    </span>
+                                    <span className="font-mono text-xs text-muted-foreground">
+                                        @{Math.round(comment.x)}%, {Math.round(comment.y)}%
+                                    </span>
                                 </div>
                             </div>
-                        ))
-                    )}
-                </div>
-            </ScrollArea>
+                        ))}
+                    </div>
+                )}
+            </div>
 
-            <div className="border-t p-4">
-                <div className="flex gap-2">
-                    <Input
-                        placeholder="Add a general comment..."
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault()
-                                handleSubmit()
-                            }
-                        }}
-                    />
-                    <Button size="icon" onClick={handleSubmit}>
-                        <Send className="h-4 w-4" />
-                    </Button>
+            {/* Input Footer */}
+            <div className="p-4 border-t border-border">
+                <div className="flex flex-col gap-2">
+                    <span className="slash-label">Add Comment</span>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Type your comment..."
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault()
+                                    handleSubmit()
+                                }
+                            }}
+                            className="flex-1 bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
+                        />
+                        <button
+                            onClick={handleSubmit}
+                            className="btn-action px-4"
+                        >
+                            Send
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

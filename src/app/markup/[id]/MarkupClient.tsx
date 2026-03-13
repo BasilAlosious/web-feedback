@@ -4,8 +4,6 @@ import { useState } from "react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
-import { Button } from "@/components/ui/button"
-import { AlertCircle, ArrowLeft } from "lucide-react"
 import { Markup, Comment } from "@/lib/db"
 import Link from "next/link"
 import { CommentPin } from "@/components/comments/CommentPin"
@@ -30,7 +28,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     // Comment state
     const [comments, setComments] = useState<Comment[]>(initialComments)
     const [newComment, setNewComment] = useState<{ x: number, y: number } | null>(null)
-    const [showThread, setShowThread] = useState(false)
+    const [showThread, setShowThread] = useState(true)
 
     const handleCanvasClick = (x: number, y: number) => {
         if (mode === "comment") {
@@ -49,7 +47,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             x: newComment.x,
             y: newComment.y,
             content,
-            author: "Agency User", // TODO: Real user auth
+            author: "Agency User",
             createdAt: new Date().toISOString(),
         }
 
@@ -60,18 +58,15 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
         // Server Action
         try {
             const savedComment = await addComment(markup.id, content, newComment.x, newComment.y, "Agency User")
-            // Replace optimistic with real (though in this simple case they are similar, but ID might differ if server generated it differently)
-            // Since our server action generates ID, we should update it.
             setComments(prev => prev.map(c => c.id === tempId ? savedComment : c))
         } catch (error) {
             console.error("Failed to save comment", error)
-            setComments(prev => prev.filter(c => c.id !== tempId)) // Revert
+            setComments(prev => prev.filter(c => c.id !== tempId))
         }
     }
 
     const handleAddThreadComment = (content: string) => {
-        // For now, threads are just flat comments. 
-        // In a real app, this would add a reply.
+        // For now, threads are just flat comments.
     }
 
     const handleShare = () => {
@@ -86,22 +81,27 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
 
     if (!markup) {
         return (
-            <div className="flex flex-col items-center justify-center h-screen gap-4">
-                <h2 className="text-xl font-semibold">Markup not found</h2>
+            <div className="flex flex-col items-center justify-center h-screen gap-4 bg-background">
+                <div className="status-widget w-64 h-32">
+                    <div className="status-widget-header">[ NOT_FOUND ]</div>
+                </div>
+                <p className="font-mono text-xs text-muted-foreground uppercase">
+                    Markup not found
+                </p>
                 {!isGuest && (
-                    <Button asChild>
-                        <Link href={`/projects/${projectId}`}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Project
-                        </Link>
-                    </Button>
+                    <Link href={`/projects/${projectId}`} className="btn-action mt-4">
+                        [←] Back to Project
+                    </Link>
                 )}
             </div>
         )
     }
 
     return (
-        <div className="flex h-screen relative overflow-hidden">
+        <div className="flex h-screen relative overflow-hidden bg-background">
+            {/* Main Content Area */}
             <div className="flex-1 flex flex-col relative min-w-0">
+                {/* Toolbar */}
                 <MarkupToolbar
                     projectId={markup.projectId}
                     projectName={markup.name}
@@ -112,78 +112,99 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     onToggleThread={() => setShowThread(!showThread)}
                     isGuest={isGuest}
                     onShare={handleShare}
+                    commentCount={comments.length}
                 />
 
-                <div className="relative flex-1 bg-muted/20 overflow-auto flex justify-center">
-                    {/* Comments Layer */}
-                    <div className="absolute inset-0 z-20 pointer-events-none">
-                        {comments.map((comment, i) => (
-                            <div key={comment.id} className="pointer-events-auto">
-                                <CommentPin
-                                    x={comment.x}
-                                    y={comment.y}
-                                    number={i + 1}
-                                    author={comment.author}
-                                    content={comment.content}
-                                    onClick={() => setShowThread(true)}
-                                />
-                            </div>
-                        ))}
-
-                        {newComment && (
-                            <div className="pointer-events-auto">
-                                <CommentPin
-                                    x={newComment.x}
-                                    y={newComment.y}
-                                    number={comments.length + 1}
-                                    isNew
-                                    onSave={handleSaveComment}
-                                    onCancel={() => setNewComment(null)}
-                                />
-                            </div>
-                        )}
+                {/* Canvas Area */}
+                <div className="relative flex-1 flex flex-col overflow-hidden">
+                    {/* Preview Header Bar */}
+                    <div className="h-8 border-b border-border flex items-center justify-center bg-card">
+                        <span className="font-mono text-xs text-muted-foreground">
+                            {markup.type === "image" ? "[ IMAGE_PREVIEW ]" : `[ ${markup.url} ]`}
+                        </span>
                     </div>
 
-                    {showFallback || markup.type === "image" ? (
-                        <CanvasRenderer
-                            imageUrl={markup.url || fallbackImage}
-                            mode={mode}
-                            onCommentClick={handleCanvasClick}
-                        />
-                    ) : (
-                        <>
-                            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    className="bg-red-500 hover:bg-red-600 shadow-md"
+                    {/* Preview Content Area */}
+                    <div className="relative flex-1 overflow-hidden">
+                        {/* Mode Switch Buttons */}
+                        {!showFallback && markup.type !== "image" && (
+                            <div className="absolute top-2 left-2 z-50 flex gap-2">
+                                <button
                                     onClick={() => setShowFallback(true)}
+                                    className="btn-action text-xs bg-background"
                                 >
-                                    <AlertCircle className="mr-2 h-4 w-4" />
-                                    Site blocked? Switch to Screenshot Mode
-                                </Button>
-                            </div>
-                            <div className="absolute top-4 right-4 z-50">
-                                <Button
-                                    variant={useProxy ? "default" : "secondary"}
-                                    size="sm"
+                                    [!] Screenshot Mode
+                                </button>
+                                <button
                                     onClick={() => setUseProxy(!useProxy)}
-                                    className="shadow-md"
+                                    className={`btn-action text-xs ${useProxy ? "btn-action-primary" : "bg-background"}`}
                                 >
-                                    {useProxy ? "Disable Proxy" : "Enable Proxy (Fix Load Issues)"}
-                                </Button>
+                                    {useProxy ? "[✓] Proxy On" : "[P] Enable Proxy"}
+                                </button>
                             </div>
+                        )}
+
+                        {/* Comments Layer */}
+                        <div className="absolute inset-0 z-20 pointer-events-none">
+                            {comments.map((comment, i) => (
+                                <div key={comment.id} className="pointer-events-auto">
+                                    <CommentPin
+                                        x={comment.x}
+                                        y={comment.y}
+                                        number={i + 1}
+                                        author={comment.author}
+                                        content={comment.content}
+                                        onClick={() => setShowThread(true)}
+                                    />
+                                </div>
+                            ))}
+
+                            {newComment && (
+                                <div className="pointer-events-auto">
+                                    <CommentPin
+                                        x={newComment.x}
+                                        y={newComment.y}
+                                        number={comments.length + 1}
+                                        isNew
+                                        onSave={handleSaveComment}
+                                        onCancel={() => setNewComment(null)}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Renderer */}
+                        {showFallback || markup.type === "image" ? (
+                            <CanvasRenderer
+                                imageUrl={markup.url || fallbackImage}
+                                mode={mode}
+                                onCommentClick={handleCanvasClick}
+                            />
+                        ) : (
                             <IframeRenderer
                                 url={useProxy ? `/api/proxy?url=${encodeURIComponent(markup.url)}` : markup.url}
                                 viewport={viewport}
                                 mode={mode}
                                 onCommentClick={handleCanvasClick}
                             />
-                        </>
-                    )}
+                        )}
+                    </div>
+                </div>
+
+                {/* Footer Status */}
+                <div className="h-8 border-t border-border px-4 flex items-center justify-between">
+                    <span className="font-mono text-xs text-muted-foreground">
+                        <span className="text-foreground">[Click]</span> Add Comment{" "}
+                        <span className="text-foreground">[Drag]</span> Pan{" "}
+                        <span className="text-foreground">[Scroll]</span> Zoom
+                    </span>
+                    <span className="font-mono text-xs text-muted-foreground">
+                        {mode === "comment" ? "COMMENT_MODE" : "BROWSE_MODE"} | {viewport.toUpperCase()}
+                    </span>
                 </div>
             </div>
 
+            {/* Comment Thread Panel */}
             {showThread && (
                 <CommentThread
                     markupId={markupId}

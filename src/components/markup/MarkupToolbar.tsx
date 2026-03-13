@@ -1,11 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { ArrowLeft, MessageSquare, MousePointer2, Share2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
-import { ViewportControls } from "@/components/markup/ViewportControls"
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
+import { Monitor, Tablet, Smartphone } from "lucide-react"
 
 interface MarkupToolbarProps {
     projectId: string
@@ -17,6 +13,7 @@ interface MarkupToolbarProps {
     onToggleThread?: () => void
     isGuest?: boolean
     onShare?: () => void
+    commentCount?: number
 }
 
 export function MarkupToolbar({
@@ -28,58 +25,79 @@ export function MarkupToolbar({
     onModeChange,
     onToggleThread,
     isGuest = false,
-    onShare
+    onShare,
+    commentCount = 0
 }: MarkupToolbarProps) {
     return (
-        <div className="flex items-center justify-between border-b bg-background p-2 h-14">
+        <div className="flex items-center justify-between border-b border-border bg-background px-4 h-10">
+            {/* Left: Back & Title */}
             <div className="flex items-center gap-4">
-                {!isGuest ? (
-                    <Button variant="ghost" size="icon" asChild>
-                        <Link href={`/projects/${projectId}`}>
-                            <ArrowLeft className="h-4 w-4" />
-                        </Link>
-                    </Button>
-                ) : (
-                    <div className="w-10" /> // Spacer
+                {!isGuest && (
+                    <Link href={`/projects/${projectId}`} className="nav-item">
+                        <span className="text-foreground">[←]</span> Back
+                    </Link>
                 )}
-                <span className="font-medium text-sm hidden sm:inline-block">
+                <span className="text-muted-foreground">/</span>
+                <span className="font-mono text-xs uppercase text-foreground">
                     {projectName}
                 </span>
             </div>
 
-            <div className="flex items-center gap-2">
-                <ViewportControls viewport={viewport} onViewportChange={onViewportChange} />
+            {/* Center: Viewport & Mode Controls */}
+            <div className="flex items-center gap-6">
+                {/* Viewport */}
+                <div className="flex items-center gap-2">
+                    <span className="slash-label mr-2">Device</span>
+                    <button
+                        onClick={() => onViewportChange("desktop")}
+                        className={`nav-item flex items-center gap-1 ${viewport === "desktop" ? "text-foreground" : ""}`}
+                    >
+                        <Monitor className="h-3 w-3" />
+                        <span className="text-foreground">[D]</span>
+                    </button>
+                    <button
+                        onClick={() => onViewportChange("tablet")}
+                        className={`nav-item flex items-center gap-1 ${viewport === "tablet" ? "text-foreground" : ""}`}
+                    >
+                        <Tablet className="h-3 w-3" />
+                        <span className="text-foreground">[T]</span>
+                    </button>
+                    <button
+                        onClick={() => onViewportChange("mobile")}
+                        className={`nav-item flex items-center gap-1 ${viewport === "mobile" ? "text-foreground" : ""}`}
+                    >
+                        <Smartphone className="h-3 w-3" />
+                        <span className="text-foreground">[M]</span>
+                    </button>
+                </div>
 
-                <Separator orientation="vertical" className="h-6 mx-2" />
-
-                <ToggleGroup
-                    type="single"
-                    value={mode}
-                    onValueChange={(value) => {
-                        if (value) onModeChange(value as "browse" | "comment")
-                    }}
-                    className="border rounded-md"
-                >
-                    <ToggleGroupItem value="browse" aria-label="Browse Mode">
-                        <MousePointer2 className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Browse</span>
-                    </ToggleGroupItem>
-                    <ToggleGroupItem value="comment" aria-label="Comment Mode">
-                        <MessageSquare className="h-4 w-4 mr-2" />
-                        <span className="hidden sm:inline">Comment</span>
-                    </ToggleGroupItem>
-                </ToggleGroup>
+                {/* Mode */}
+                <div className="flex items-center gap-2">
+                    <span className="slash-label mr-2">Mode</span>
+                    <button
+                        onClick={() => onModeChange("browse")}
+                        className={`nav-item ${mode === "browse" ? "text-foreground" : ""}`}
+                    >
+                        <span className="text-foreground">[B]</span> Browse
+                    </button>
+                    <button
+                        onClick={() => onModeChange("comment")}
+                        className={`nav-item ${mode === "comment" ? "text-foreground" : ""}`}
+                    >
+                        <span className="text-foreground">[C]</span> Comment
+                    </button>
+                </div>
             </div>
 
-            <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={onToggleThread}>
-                    <MessageSquare className="h-4 w-4" />
-                </Button>
+            {/* Right: Actions */}
+            <div className="flex items-center gap-4">
+                <button onClick={onToggleThread} className="nav-item">
+                    <span className="text-foreground">[{commentCount}]</span> Comments
+                </button>
                 {!isGuest && (
-                    <Button variant="outline" size="sm" onClick={onShare}>
-                        <Share2 className="h-4 w-4 mr-2" />
-                        Share
-                    </Button>
+                    <button onClick={onShare} className="nav-item">
+                        <span className="text-foreground">[S]</span> Share
+                    </button>
                 )}
             </div>
         </div>

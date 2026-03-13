@@ -2,17 +2,18 @@
 
 import { useFormStatus } from 'react-dom'
 import { login } from './actions'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useState } from 'react'
 
 function SubmitButton() {
     const { pending } = useFormStatus()
     return (
-        <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Logging in...' : 'Login'}
-        </Button>
+        <button
+            type="submit"
+            className="btn-action-primary w-full"
+            disabled={pending}
+        >
+            {pending ? '[...] Authenticating' : '[→] Login'}
+        </button>
     )
 }
 
@@ -27,26 +28,58 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="flex min-h-screen items-center justify-center bg-gray-100">
-            <Card className="w-[350px]">
-                <CardHeader>
-                    <CardTitle>Agency Login</CardTitle>
-                    <CardDescription>Enter the admin password to access Feedback 2.0</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form action={handleSubmit} className="space-y-4">
-                        <Input
-                            type="password"
-                            name="password"
-                            placeholder="Password"
-                            required
-                            className="bg-white"
-                        />
-                        {error && <p className="text-sm text-red-500">{error}</p>}
-                        <SubmitButton />
+        <div className="flex min-h-screen items-center justify-center bg-background">
+            <div className="w-full max-w-sm">
+                {/* Status Widget Header */}
+                <div className="status-widget h-24 mb-8">
+                    <div className="status-widget-header">[ FEEDBACK_2.0 ]</div>
+                </div>
+
+                {/* Login Card */}
+                <div className="border border-border bg-card">
+                    {/* Header */}
+                    <div className="px-6 py-4 border-b border-border">
+                        <h1 className="font-mono text-sm uppercase font-medium">
+                            Agency Login
+                        </h1>
+                        <p className="font-mono text-xs text-muted-foreground mt-1">
+                            Enter credentials to access the system
+                        </p>
+                    </div>
+
+                    {/* Form */}
+                    <form action={handleSubmit} className="p-6">
+                        <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="slash-label">Password</label>
+                                <input
+                                    type="password"
+                                    name="password"
+                                    placeholder="••••••••"
+                                    required
+                                    className="w-full bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="flex items-center gap-2 text-destructive font-mono text-xs">
+                                    <span>[!]</span>
+                                    <span>{error}</span>
+                                </div>
+                            )}
+
+                            <SubmitButton />
+                        </div>
                     </form>
-                </CardContent>
-            </Card>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 text-center">
+                    <span className="font-mono text-xs text-muted-foreground">
+                        <span className="text-foreground">[?]</span> Contact admin for access
+                    </span>
+                </div>
+            </div>
         </div>
     )
 }

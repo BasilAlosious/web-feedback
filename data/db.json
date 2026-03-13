@@ -1,6 +1,13 @@
 {
   "projects": [
     {
+      "id": "h2we8",
+      "name": "Basil",
+      "url": "http://basenine.co",
+      "markupCount": 1,
+      "updatedAt": "Just now"
+    },
+    {
       "id": "r8k4pn",
       "name": "Share Test Project",
       "url": "http://example.com",
@@ -9,6 +16,15 @@
     }
   ],
   "markups": [
+    {
+      "id": "p2npx",
+      "projectId": "h2we8",
+      "name": "home",
+      "url": "https://basenine.co",
+      "viewport": "desktop",
+      "commentCount": 2,
+      "type": "website"
+    },
     {
       "id": "410ng",
       "projectId": "r8k4pn",
@@ -55,6 +71,24 @@
       "content": "not nice",
       "author": "Agency User",
       "createdAt": "2026-02-13T22:19:31.481Z"
+    },
+    {
+      "id": "3b663",
+      "markupId": "p2npx",
+      "x": 24.746835443037973,
+      "y": 43.792325056433405,
+      "content": "Needs improvement",
+      "author": "Agency User",
+      "createdAt": "2026-02-24T12:19:50.032Z"
+    },
+    {
+      "id": "7y6fsm",
+      "markupId": "p2npx",
+      "x": 60.949367088607595,
+      "y": 66.59142212189616,
+      "content": "Change these images",
+      "author": "Agency User",
+      "createdAt": "2026-02-24T12:20:01.032Z"
     }
   ]
 }

@@ -47,6 +47,10 @@ export async function createMarkup(prevState: any, formData: FormData) {
     return { success: true }
 }
 
+export async function getComments(markupId: string): Promise<Comment[]> {
+    return db.getComments(markupId)
+}
+
 export async function addComment(markupId: string, content: string, x: number, y: number, author: string = 'Agency User') {
     const newComment: Comment = {
         id: Math.random().toString(36).substring(7),
