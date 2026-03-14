@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { Maximize, Minimize } from "lucide-react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
@@ -48,17 +49,6 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             document.exitFullscreen().catch(() => {})
         }
     }
-
-    // [F] keyboard shortcut
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => {
-            const tag = (e.target as HTMLElement).tagName
-            if (tag === "INPUT" || tag === "TEXTAREA") return
-            if (e.key === "f" || e.key === "F") handleFullscreen()
-        }
-        document.addEventListener("keydown", handler)
-        return () => document.removeEventListener("keydown", handler)
-    }, [])
 
     const handleCanvasClick = (x: number, y: number) => {
         if (mode === "comment") {
@@ -151,8 +141,6 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     isGuest={isGuest}
                     onShare={handleShare}
                     commentCount={comments.length}
-                    isFullscreen={isFullscreen}
-                    onFullscreen={handleFullscreen}
                 />
 
                 {/* Canvas Area */}
@@ -166,6 +154,23 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
 
                     {/* Preview Content Area */}
                     <div className="relative flex-1 overflow-hidden">
+                        {/* Fullscreen floating button */}
+                        <button
+                            onClick={handleFullscreen}
+                            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                            className={`absolute bottom-4 right-4 z-50 flex items-center gap-1.5 px-3 py-2
+                                font-mono text-xs uppercase font-medium border transition-all shadow-md
+                                ${isFullscreen
+                                    ? "bg-[#88FF66] text-black border-[#88FF66] hover:bg-[#6de050]"
+                                    : "bg-background text-foreground border-foreground hover:bg-foreground hover:text-background"
+                                }`}
+                        >
+                            {isFullscreen
+                                ? <><Minimize className="h-3.5 w-3.5" /> Exit Fullscreen</>
+                                : <><Maximize className="h-3.5 w-3.5" /> Fullscreen</>
+                            }
+                        </button>
+
                         {/* Mode Switch Buttons */}
                         {!showFallback && markup.type !== "image" && (
                             <div className="absolute top-2 left-2 z-50 flex gap-2">
@@ -237,12 +242,10 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     <span className="font-mono text-xs text-muted-foreground">
                         <span className="text-foreground">[Click]</span> Add Comment{" "}
                         <span className="text-foreground">[Drag]</span> Pan{" "}
-                        <span className="text-foreground">[Scroll]</span> Zoom{" "}
-                        <span className="text-foreground">[F]</span> Fullscreen
+                        <span className="text-foreground">[Scroll]</span> Zoom
                     </span>
                     <span className="font-mono text-xs text-muted-foreground">
                         {mode === "comment" ? "COMMENT_MODE" : "BROWSE_MODE"} | {viewport.toUpperCase()}
-                        {isFullscreen ? " | FULLSCREEN" : ""}
                     </span>
                 </div>
             </div>

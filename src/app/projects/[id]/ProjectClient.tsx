@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { Maximize, Minimize } from "lucide-react"
 import { Markup, Comment, Project } from "@/lib/db"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
@@ -77,6 +78,21 @@ export function ProjectClient({
     const [editingMarkupId, setEditingMarkupId] = useState<string | null>(null)
     const [editingName, setEditingName] = useState("")
     const [deletingMarkupId, setDeletingMarkupId] = useState<string | null>(null)
+
+    // Fullscreen
+    const [isFullscreen, setIsFullscreen] = useState(false)
+    useEffect(() => {
+        const handler = () => setIsFullscreen(!!document.fullscreenElement)
+        document.addEventListener("fullscreenchange", handler)
+        return () => document.removeEventListener("fullscreenchange", handler)
+    }, [])
+    const handleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {})
+        } else {
+            document.exitFullscreen().catch(() => {})
+        }
+    }
 
     // ── Page selection ──────────────────────────────────────────────────────
     const handlePageSelect = async (markup: Markup) => {
@@ -443,6 +459,23 @@ export function ProjectClient({
                                 backgroundSize: "20px 20px",
                             }}
                         >
+                            {/* Fullscreen floating button */}
+                            <button
+                                onClick={handleFullscreen}
+                                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                                className={`absolute bottom-4 right-4 z-50 flex items-center gap-1.5 px-3 py-2
+                                    font-mono text-xs uppercase font-medium border transition-all shadow-md
+                                    ${isFullscreen
+                                        ? "bg-[#88FF66] text-black border-[#88FF66] hover:bg-[#6de050]"
+                                        : "bg-background text-foreground border-foreground hover:bg-foreground hover:text-background"
+                                    }`}
+                            >
+                                {isFullscreen
+                                    ? <><Minimize className="h-3.5 w-3.5" /> Exit Fullscreen</>
+                                    : <><Maximize className="h-3.5 w-3.5" /> Fullscreen</>
+                                }
+                            </button>
+
                             {/* Proxy / screenshot mode toggles */}
                             {!showFallback && selectedMarkup.type !== "image" && (
                                 <div className="absolute top-2 left-2 z-50 flex gap-2">
