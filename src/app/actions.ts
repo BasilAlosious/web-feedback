@@ -90,6 +90,10 @@ export async function updateCommentStatus(commentId: string, status: 'open' | 'i
     return db.updateComment(commentId, { status })
 }
 
+export async function updateCommentPriority(commentId: string, priority: 'high' | 'medium' | 'low' | undefined) {
+    return db.updateComment(commentId, { priority })
+}
+
 export async function getCommentsForProject(projectId: string) {
     return db.getCommentsForProject(projectId)
 }

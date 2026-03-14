@@ -15,16 +15,25 @@ const STATUS_ICON: Record<string, string> = {
     resolved: '[✓]',
 }
 
+const STATUS_LABEL: Record<string, string> = {
+    open: 'Open',
+    in_progress: 'In Progress',
+    resolved: 'Resolved',
+}
+
+// Cycling: none → high → medium → low → none
+const PRIORITY_CYCLE: Array<Comment["priority"]> = [undefined, 'high', 'medium', 'low']
+
 const PRIORITY_LABEL: Record<string, string> = {
-    high: '[!!]',
-    medium: '[~]',
-    low: '[-]',
+    high:   '[!!] HIGH',
+    medium: '[~]  MED',
+    low:    '[-]  LOW',
 }
 
 const PRIORITY_COLOR: Record<string, string> = {
-    high: '#EF4444',
-    medium: '#F59E0B',
-    low: '#9CA3AF',
+    high:   'text-red-400',
+    medium: 'text-yellow-400',
+    low:    'text-muted-foreground',
 }
 
 interface CommentThreadProps {
@@ -33,15 +42,29 @@ interface CommentThreadProps {
     onClose: () => void
     onAddComment?: (content: string) => void
     onUpdateStatus?: (commentId: string, status: 'open' | 'in_progress' | 'resolved') => void
+    onUpdatePriority?: (commentId: string, priority: 'high' | 'medium' | 'low' | undefined) => void
 }
 
-export function CommentThread({ markupId, comments, onClose, onAddComment, onUpdateStatus }: CommentThreadProps) {
+export function CommentThread({
+    markupId,
+    comments,
+    onClose,
+    onAddComment,
+    onUpdateStatus,
+    onUpdatePriority,
+}: CommentThreadProps) {
     const [inputValue, setInputValue] = useState("")
 
     const handleSubmit = () => {
         if (!inputValue.trim()) return
         onAddComment?.(inputValue)
         setInputValue("")
+    }
+
+    const handleCyclePriority = (comment: Comment) => {
+        const idx = PRIORITY_CYCLE.indexOf(comment.priority)
+        const next = PRIORITY_CYCLE[(idx + 1) % PRIORITY_CYCLE.length]
+        onUpdatePriority?.(comment.id, next)
     }
 
     const formatTime = (dateString: string) => {
@@ -55,9 +78,9 @@ export function CommentThread({ markupId, comments, onClose, onAddComment, onUpd
     }
 
     return (
-        <div className="detail-panel w-80 border-l border-border h-full">
+        <div className="detail-panel w-80 border-l border-border h-full flex flex-col">
             {/* Header */}
-            <div className="detail-header">
+            <div className="detail-header flex-shrink-0">
                 <span className="slash-label">Comments</span>
                 <button onClick={onClose} className="nav-item">
                     <span className="text-foreground">[×]</span> Close
@@ -82,10 +105,13 @@ export function CommentThread({ markupId, comments, onClose, onAddComment, onUpd
                     <div className="flex flex-col">
                         {comments.map((comment, i) => {
                             const status = comment.status ?? 'open'
+                            const priColor = comment.priority ? PRIORITY_COLOR[comment.priority] : 'text-muted-foreground'
+                            const priLabel = comment.priority ? PRIORITY_LABEL[comment.priority] : '[— PRI]'
+
                             return (
                                 <div
                                     key={comment.id}
-                                    className="p-4 border-b border-border-light hover:bg-muted/30 transition-colors"
+                                    className="p-4 border-b border-border hover:bg-muted/30 transition-colors"
                                 >
                                     {/* Comment Header */}
                                     <div className="flex items-center justify-between mb-2">
@@ -96,27 +122,18 @@ export function CommentThread({ markupId, comments, onClose, onAddComment, onUpd
                                             <span className="font-mono text-xs font-medium">
                                                 {comment.author}
                                             </span>
-                                            {comment.priority && (
-                                                <span
-                                                    className="font-mono text-xs"
-                                                    style={{ color: PRIORITY_COLOR[comment.priority] }}
-                                                >
-                                                    {PRIORITY_LABEL[comment.priority]}
-                                                </span>
-                                            )}
                                         </div>
+
+                                        {/* Right: status toggle + time */}
                                         <div className="flex items-center gap-1">
-                                            {/* Status toggle */}
                                             <button
                                                 onClick={() => onUpdateStatus?.(comment.id, STATUS_NEXT[status])}
                                                 className={`font-mono text-xs transition-colors ${
-                                                    status === 'resolved'
-                                                        ? 'text-[#88FF66]'
-                                                        : status === 'in_progress'
-                                                        ? 'text-[#F59E0B]'
-                                                        : 'text-muted-foreground hover:text-foreground'
+                                                    status === 'resolved'   ? 'text-[#88FF66]' :
+                                                    status === 'in_progress' ? 'text-yellow-400' :
+                                                    'text-muted-foreground hover:text-foreground'
                                                 }`}
-                                                title={`Status: ${status} — click to advance`}
+                                                title={`Status: ${STATUS_LABEL[status]} — click to advance`}
                                             >
                                                 {STATUS_ICON[status]}
                                             </button>
@@ -127,18 +144,25 @@ export function CommentThread({ markupId, comments, onClose, onAddComment, onUpd
                                     </div>
 
                                     {/* Comment Content */}
-                                    <p className="text-sm text-foreground pl-8">
+                                    <p className="text-sm text-foreground pl-8 leading-relaxed">
                                         {comment.content}
                                     </p>
 
-                                    {/* Comment Meta */}
-                                    <div className="flex items-center gap-4 mt-3 pl-8">
+                                    {/* Comment Meta + priority button */}
+                                    <div className="flex items-center justify-between mt-3 pl-8">
                                         <span className="font-mono text-xs text-muted-foreground">
-                                            {formatDate(comment.createdAt)}
+                                            {formatDate(comment.createdAt)} · @{Math.round(comment.x)}%,{Math.round(comment.y)}%
                                         </span>
-                                        <span className="font-mono text-xs text-muted-foreground">
-                                            @{Math.round(comment.x)}%, {Math.round(comment.y)}%
-                                        </span>
+
+                                        {/* Priority cycling button */}
+                                        <button
+                                            onClick={() => handleCyclePriority(comment)}
+                                            title="Click to cycle priority: high → medium → low → none"
+                                            className={`font-mono text-xs border border-border px-1.5 py-0.5
+                                                hover:border-foreground transition-colors ${priColor}`}
+                                        >
+                                            {priLabel}
+                                        </button>
                                     </div>
                                 </div>
                             )
@@ -148,7 +172,7 @@ export function CommentThread({ markupId, comments, onClose, onAddComment, onUpd
             </div>
 
             {/* Input Footer */}
-            <div className="p-4 border-t border-border">
+            <div className="p-4 border-t border-border flex-shrink-0">
                 <div className="flex flex-col gap-2">
                     <span className="slash-label">Add Comment</span>
                     <div className="flex gap-2">
@@ -165,10 +189,7 @@ export function CommentThread({ markupId, comments, onClose, onAddComment, onUpd
                             }}
                             className="flex-1 bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
                         />
-                        <button
-                            onClick={handleSubmit}
-                            className="btn-action px-4"
-                        >
+                        <button onClick={handleSubmit} className="btn-action px-4">
                             Send
                         </button>
                     </div>

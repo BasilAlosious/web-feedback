@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Monitor, Tablet, Smartphone } from "lucide-react"
+import { Monitor, Tablet, Smartphone, Maximize, Minimize } from "lucide-react"
 
 interface MarkupToolbarProps {
     projectId: string
@@ -14,6 +14,8 @@ interface MarkupToolbarProps {
     isGuest?: boolean
     onShare?: () => void
     commentCount?: number
+    isFullscreen?: boolean
+    onFullscreen?: () => void
 }
 
 export function MarkupToolbar({
@@ -26,10 +28,12 @@ export function MarkupToolbar({
     onToggleThread,
     isGuest = false,
     onShare,
-    commentCount = 0
+    commentCount = 0,
+    isFullscreen = false,
+    onFullscreen,
 }: MarkupToolbarProps) {
     return (
-        <div className="flex items-center justify-between border-b border-border bg-background px-4 h-10">
+        <div className="flex items-center justify-between border-b border-border bg-background px-4 h-10 flex-shrink-0">
             {/* Left: Back & Title */}
             <div className="flex items-center gap-4">
                 {!isGuest && (
@@ -99,6 +103,21 @@ export function MarkupToolbar({
                         <span className="text-foreground">[S]</span> Share
                     </button>
                 )}
+                {/* Fullscreen — always visible, prominent */}
+                <button
+                    onClick={onFullscreen}
+                    title={isFullscreen ? "Exit fullscreen [F]" : "Enter fullscreen [F]"}
+                    className={`nav-item flex items-center gap-1 border px-2 py-1 transition-colors ${
+                        isFullscreen
+                            ? "border-[#88FF66] text-[#88FF66]"
+                            : "border-border hover:border-foreground hover:text-foreground"
+                    }`}
+                >
+                    {isFullscreen
+                        ? <><Minimize className="h-3 w-3" /><span className="text-[#88FF66]">[F]</span> Exit Full</>
+                        : <><Maximize className="h-3 w-3" /><span className="text-foreground">[F]</span> Full</>
+                    }
+                </button>
             </div>
         </div>
     )

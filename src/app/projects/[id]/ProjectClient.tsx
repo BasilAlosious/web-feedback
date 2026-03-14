@@ -15,6 +15,7 @@ import {
     renameMarkup,
     deleteMarkup,
     updateCommentStatus,
+    updateCommentPriority,
 } from "@/app/actions"
 import Link from "next/link"
 
@@ -124,6 +125,17 @@ export function ProjectClient({
             await updateCommentStatus(commentId, status)
         } catch {
             // revert on failure
+            const fetched = await getComments(selectedMarkup?.id ?? "")
+            setComments(fetched)
+        }
+    }
+
+    // ── Comment priority update ─────────────────────────────────────────────
+    const handleUpdatePriority = async (commentId: string, priority: 'high' | 'medium' | 'low' | undefined) => {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, priority } : c))
+        try {
+            await updateCommentPriority(commentId, priority)
+        } catch {
             const fetched = await getComments(selectedMarkup?.id ?? "")
             setComments(fetched)
         }
@@ -523,6 +535,7 @@ export function ProjectClient({
                     onClose={() => {}}
                     onAddComment={() => {}}
                     onUpdateStatus={handleUpdateStatus}
+                    onUpdatePriority={handleUpdatePriority}
                 />
             ) : (
                 <aside className="border-l border-border flex items-center justify-center">

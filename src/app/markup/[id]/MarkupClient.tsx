@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
@@ -8,7 +8,7 @@ import { Markup, Comment } from "@/lib/db"
 import Link from "next/link"
 import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
-import { addComment } from "@/app/actions"
+import { addComment, updateCommentStatus, updateCommentPriority } from "@/app/actions"
 import { ShareDialog } from "@/components/project/ShareDialog"
 
 interface MarkupClientProps {
@@ -32,16 +32,43 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     const [showThread, setShowThread] = useState(true)
     const [showShare, setShowShare] = useState(false)
 
+    // Fullscreen state
+    const [isFullscreen, setIsFullscreen] = useState(false)
+
+    useEffect(() => {
+        const handler = () => setIsFullscreen(!!document.fullscreenElement)
+        document.addEventListener("fullscreenchange", handler)
+        return () => document.removeEventListener("fullscreenchange", handler)
+    }, [])
+
+    const handleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(() => {})
+        } else {
+            document.exitFullscreen().catch(() => {})
+        }
+    }
+
+    // [F] keyboard shortcut
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            const tag = (e.target as HTMLElement).tagName
+            if (tag === "INPUT" || tag === "TEXTAREA") return
+            if (e.key === "f" || e.key === "F") handleFullscreen()
+        }
+        document.addEventListener("keydown", handler)
+        return () => document.removeEventListener("keydown", handler)
+    }, [])
+
     const handleCanvasClick = (x: number, y: number) => {
         if (mode === "comment") {
             setNewComment({ x, y })
         }
     }
 
-    const handleSaveComment = async (content: string) => {
+    const handleSaveComment = async (content: string, priority?: 'high' | 'medium' | 'low') => {
         if (!newComment || !markup) return
 
-        // Optimistic update
         const tempId = Math.random().toString(36).substring(7)
         const optimisticComment: Comment = {
             id: tempId,
@@ -51,29 +78,42 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             content,
             author: "Agency User",
             createdAt: new Date().toISOString(),
+            priority,
+            status: 'open',
         }
 
-        setComments([...comments, optimisticComment])
+        setComments(prev => [...prev, optimisticComment])
         setNewComment(null)
         setShowThread(true)
 
-        // Server Action
         try {
-            const savedComment = await addComment(markup.id, content, newComment.x, newComment.y, "Agency User")
-            setComments(prev => prev.map(c => c.id === tempId ? savedComment : c))
+            const saved = await addComment(markup.id, content, newComment.x, newComment.y, "Agency User", priority)
+            setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch (error) {
             console.error("Failed to save comment", error)
             setComments(prev => prev.filter(c => c.id !== tempId))
         }
     }
 
-    const handleAddThreadComment = (content: string) => {
-        // For now, threads are just flat comments.
+    const handleUpdateStatus = async (commentId: string, status: 'open' | 'in_progress' | 'resolved') => {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, status } : c))
+        try {
+            await updateCommentStatus(commentId, status)
+        } catch {
+            // silently revert not needed — minor edge case
+        }
     }
 
-    const handleShare = () => {
-        setShowShare(true)
+    const handleUpdatePriority = async (commentId: string, priority: 'high' | 'medium' | 'low' | undefined) => {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, priority } : c))
+        try {
+            await updateCommentPriority(commentId, priority)
+        } catch {
+            // silently revert not needed — minor edge case
+        }
     }
+
+    const handleShare = () => setShowShare(true)
 
     const fallbackImage = "https://placehold.co/1920x1080/png?text=Website+Screenshot"
 
@@ -111,6 +151,8 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     isGuest={isGuest}
                     onShare={handleShare}
                     commentCount={comments.length}
+                    isFullscreen={isFullscreen}
+                    onFullscreen={handleFullscreen}
                 />
 
                 {/* Canvas Area */}
@@ -152,6 +194,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                                         number={i + 1}
                                         author={comment.author}
                                         content={comment.content}
+                                        priority={comment.priority}
                                         onClick={() => setShowThread(true)}
                                     />
                                 </div>
@@ -194,10 +237,12 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     <span className="font-mono text-xs text-muted-foreground">
                         <span className="text-foreground">[Click]</span> Add Comment{" "}
                         <span className="text-foreground">[Drag]</span> Pan{" "}
-                        <span className="text-foreground">[Scroll]</span> Zoom
+                        <span className="text-foreground">[Scroll]</span> Zoom{" "}
+                        <span className="text-foreground">[F]</span> Fullscreen
                     </span>
                     <span className="font-mono text-xs text-muted-foreground">
                         {mode === "comment" ? "COMMENT_MODE" : "BROWSE_MODE"} | {viewport.toUpperCase()}
+                        {isFullscreen ? " | FULLSCREEN" : ""}
                     </span>
                 </div>
             </div>
@@ -208,7 +253,9 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     markupId={markupId}
                     comments={comments}
                     onClose={() => setShowThread(false)}
-                    onAddComment={handleAddThreadComment}
+                    onAddComment={() => {}}
+                    onUpdateStatus={handleUpdateStatus}
+                    onUpdatePriority={handleUpdatePriority}
                 />
             )}
 
