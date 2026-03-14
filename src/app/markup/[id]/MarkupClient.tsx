@@ -23,8 +23,7 @@ interface MarkupClientProps {
 export function MarkupClient({ markupId, projectId, initialData, initialComments, isGuest = false }: MarkupClientProps) {
     const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop")
     const [mode, setMode] = useState<"browse" | "comment">("comment")
-    const [showFallback, setShowFallback] = useState(false)
-    const [useProxy, setUseProxy] = useState(false)
+    const [useProxy] = useState(true)
     const [markup] = useState<Markup | undefined>(initialData)
 
     // Comment state
@@ -130,7 +129,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col relative min-w-0">
                 {/* Toolbar */}
-                <MarkupToolbar
+                {!isFullscreen && <MarkupToolbar
                     projectId={markup.projectId}
                     projectName={markup.name}
                     viewport={viewport}
@@ -141,12 +140,12 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     isGuest={isGuest}
                     onShare={handleShare}
                     commentCount={comments.length}
-                />
+                />}
 
                 {/* Canvas Area */}
                 <div className="relative flex-1 flex flex-col overflow-hidden">
                     {/* Preview Header Bar */}
-                    <div className="h-8 border-b border-border flex items-center justify-center bg-card">
+                    <div className={`h-8 border-b border-border flex items-center justify-center bg-card ${isFullscreen ? "hidden" : ""}`}>
                         <span className="font-mono text-xs text-muted-foreground">
                             {markup.type === "image" ? "[ IMAGE_PREVIEW ]" : `[ ${markup.url} ]`}
                         </span>
@@ -170,24 +169,6 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                                 : <><Maximize className="h-3.5 w-3.5" /> Fullscreen</>
                             }
                         </button>
-
-                        {/* Mode Switch Buttons */}
-                        {!showFallback && markup.type !== "image" && (
-                            <div className="absolute top-2 left-2 z-50 flex gap-2">
-                                <button
-                                    onClick={() => setShowFallback(true)}
-                                    className="btn-action text-xs bg-background"
-                                >
-                                    [!] Screenshot Mode
-                                </button>
-                                <button
-                                    onClick={() => setUseProxy(!useProxy)}
-                                    className={`btn-action text-xs ${useProxy ? "btn-action-primary" : "bg-background"}`}
-                                >
-                                    {useProxy ? "[✓] Proxy On" : "[P] Enable Proxy"}
-                                </button>
-                            </div>
-                        )}
 
                         {/* Comments Layer */}
                         <div className="absolute inset-0 z-20 pointer-events-none">
@@ -220,7 +201,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                         </div>
 
                         {/* Renderer */}
-                        {showFallback || markup.type === "image" ? (
+                        {markup.type === "image" ? (
                             <CanvasRenderer
                                 imageUrl={markup.url || fallbackImage}
                                 mode={mode}
@@ -228,7 +209,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                             />
                         ) : (
                             <IframeRenderer
-                                url={useProxy ? `/api/proxy?url=${encodeURIComponent(markup.url)}` : markup.url}
+                                url={`/api/proxy?url=${encodeURIComponent(markup.url)}`}
                                 viewport={viewport}
                                 mode={mode}
                                 onCommentClick={handleCanvasClick}
@@ -238,7 +219,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                 </div>
 
                 {/* Footer Status */}
-                <div className="h-8 border-t border-border px-4 flex items-center justify-between">
+                <div className={`h-8 border-t border-border px-4 flex items-center justify-between ${isFullscreen ? "hidden" : ""}`}>
                     <span className="font-mono text-xs text-muted-foreground">
                         <span className="text-foreground">[Click]</span> Add Comment{" "}
                         <span className="text-foreground">[Drag]</span> Pan{" "}
@@ -251,7 +232,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             </div>
 
             {/* Comment Thread Panel */}
-            {showThread && (
+            {showThread && !isFullscreen && (
                 <CommentThread
                     markupId={markupId}
                     comments={comments}

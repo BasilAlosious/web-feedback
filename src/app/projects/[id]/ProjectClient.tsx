@@ -63,8 +63,7 @@ export function ProjectClient({
     const [comments, setComments] = useState<Comment[]>(initialComments)
     const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop")
     const [mode, setMode] = useState<"browse" | "comment">("comment")
-    const [showFallback, setShowFallback] = useState(false)
-    const [useProxy, setUseProxy] = useState(false)
+    const [useProxy] = useState(true)
     const [newComment, setNewComment] = useState<{ x: number; y: number } | null>(null)
 
     // Filters
@@ -98,7 +97,6 @@ export function ProjectClient({
     const handlePageSelect = async (markup: Markup) => {
         setSelectedMarkup(markup)
         setNewComment(null)
-        setShowFallback(false)
         const fetched = await getComments(markup.id)
         setComments(fetched)
     }
@@ -226,10 +224,12 @@ export function ProjectClient({
     const fallbackImage = "https://placehold.co/1920x1080/png?text=Website+Screenshot"
 
     return (
-        <div className="grid h-full" style={{ gridTemplateColumns: "260px 1fr 320px" }}>
-
+        <div
+            className="grid h-full"
+            style={{ gridTemplateColumns: isFullscreen ? "0 1fr 0" : "260px 1fr 320px" }}
+        >
             {/* LEFT: Pages panel */}
-            <aside className="border-r border-border flex flex-col overflow-hidden">
+            <aside className={`border-r border-border flex flex-col overflow-hidden ${isFullscreen ? "hidden" : ""}`}>
                 {/* Project header */}
                 <div className="p-5 border-b border-border flex-shrink-0">
                     <Link href="/" className="nav-item block mb-3">
@@ -391,7 +391,7 @@ export function ProjectClient({
             {/* CENTER: Preview canvas */}
             <section className="flex flex-col overflow-hidden" style={{ background: "#F0F0F0" }}>
                 {/* Toolbar */}
-                <div className="h-10 border-b border-border flex items-center px-4 gap-4 bg-background flex-shrink-0">
+                <div className={`h-10 border-b border-border flex items-center px-4 gap-4 bg-background flex-shrink-0 ${isFullscreen ? "hidden" : ""}`}>
                     <span className="font-mono text-xs text-muted-foreground uppercase">
                         Viewport:{" "}
                         {viewport === "desktop" ? "1440px" : viewport === "tablet" ? "768px" : "390px"}
@@ -443,7 +443,7 @@ export function ProjectClient({
                 ) : (
                     <div className="flex flex-col flex-1 overflow-hidden">
                         {/* URL bar */}
-                        <div className="h-8 border-b border-border flex items-center justify-center bg-card flex-shrink-0">
+                        <div className={`h-8 border-b border-border flex items-center justify-center bg-card flex-shrink-0 ${isFullscreen ? "hidden" : ""}`}>
                             <span className="font-mono text-xs text-muted-foreground">
                                 {selectedMarkup.type === "image"
                                     ? "[ IMAGE_PREVIEW ]"
@@ -476,24 +476,6 @@ export function ProjectClient({
                                 }
                             </button>
 
-                            {/* Proxy / screenshot mode toggles */}
-                            {!showFallback && selectedMarkup.type !== "image" && (
-                                <div className="absolute top-2 left-2 z-50 flex gap-2">
-                                    <button
-                                        onClick={() => setShowFallback(true)}
-                                        className="btn-action text-xs bg-background"
-                                    >
-                                        [!] Screenshot Mode
-                                    </button>
-                                    <button
-                                        onClick={() => setUseProxy(!useProxy)}
-                                        className={`btn-action text-xs ${useProxy ? "btn-action-primary" : "bg-background"}`}
-                                    >
-                                        {useProxy ? "[✓] Proxy On" : "[P] Enable Proxy"}
-                                    </button>
-                                </div>
-                            )}
-
                             {/* Comment pins — filtered */}
                             <div className="absolute inset-0 z-20 pointer-events-none">
                                 {visibleComments.map((comment, i) => (
@@ -523,7 +505,7 @@ export function ProjectClient({
                             </div>
 
                             {/* Renderer */}
-                            {showFallback || selectedMarkup.type === "image" ? (
+                            {selectedMarkup.type === "image" ? (
                                 <CanvasRenderer
                                     imageUrl={selectedMarkup.url || fallbackImage}
                                     mode={mode}
@@ -531,11 +513,7 @@ export function ProjectClient({
                                 />
                             ) : (
                                 <IframeRenderer
-                                    url={
-                                        useProxy
-                                            ? `/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`
-                                            : selectedMarkup.url
-                                    }
+                                    url={`/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`}
                                     viewport={viewport}
                                     mode={mode}
                                     onCommentClick={handleCanvasClick}
@@ -546,7 +524,7 @@ export function ProjectClient({
                 )}
 
                 {/* Footer */}
-                <div className="h-8 border-t border-border px-4 flex items-center justify-between flex-shrink-0 bg-background">
+                <div className={`h-8 border-t border-border px-4 flex items-center justify-between flex-shrink-0 bg-background ${isFullscreen ? "hidden" : ""}`}>
                     <span className="font-mono text-xs text-muted-foreground">
                         <span className="text-foreground">[Click]</span> Add Comment{" "}
                         <span className="text-foreground">[B/C]</span> Mode
@@ -561,7 +539,7 @@ export function ProjectClient({
             </section>
 
             {/* RIGHT: Comments panel */}
-            {selectedMarkup ? (
+            {selectedMarkup && !isFullscreen ? (
                 <CommentThread
                     markupId={selectedMarkup.id}
                     comments={visibleComments}
@@ -571,9 +549,11 @@ export function ProjectClient({
                     onUpdatePriority={handleUpdatePriority}
                 />
             ) : (
-                <aside className="border-l border-border flex items-center justify-center">
-                    <p className="font-mono text-xs text-muted-foreground uppercase">No page selected</p>
-                </aside>
+                !isFullscreen && (
+                    <aside className="border-l border-border flex items-center justify-center">
+                        <p className="font-mono text-xs text-muted-foreground uppercase">No page selected</p>
+                    </aside>
+                )
             )}
 
             {/* Share dialog */}
