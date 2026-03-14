@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Maximize, Minimize } from "lucide-react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
@@ -32,22 +32,9 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     const [showThread, setShowThread] = useState(true)
     const [showShare, setShowShare] = useState(false)
 
-    // Fullscreen state
+    // In-app fullscreen (hides all panels, stays within browser window)
     const [isFullscreen, setIsFullscreen] = useState(false)
-
-    useEffect(() => {
-        const handler = () => setIsFullscreen(!!document.fullscreenElement)
-        document.addEventListener("fullscreenchange", handler)
-        return () => document.removeEventListener("fullscreenchange", handler)
-    }, [])
-
-    const handleFullscreen = () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {})
-        } else {
-            document.exitFullscreen().catch(() => {})
-        }
-    }
+    const handleFullscreen = () => setIsFullscreen(f => !f)
 
     const handleCanvasClick = (x: number, y: number) => {
         if (mode === "comment") {
@@ -125,7 +112,10 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     }
 
     return (
-        <div className="flex h-screen relative overflow-hidden bg-background">
+        <div className={isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex overflow-hidden"
+            : "flex h-screen relative overflow-hidden bg-background"
+        }>
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col relative min-w-0">
                 {/* Toolbar */}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Maximize, Minimize } from "lucide-react"
 import { Markup, Comment, Project } from "@/lib/db"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
@@ -78,20 +78,9 @@ export function ProjectClient({
     const [editingName, setEditingName] = useState("")
     const [deletingMarkupId, setDeletingMarkupId] = useState<string | null>(null)
 
-    // Fullscreen
+    // In-app fullscreen (hides all panels, stays within browser window)
     const [isFullscreen, setIsFullscreen] = useState(false)
-    useEffect(() => {
-        const handler = () => setIsFullscreen(!!document.fullscreenElement)
-        document.addEventListener("fullscreenchange", handler)
-        return () => document.removeEventListener("fullscreenchange", handler)
-    }, [])
-    const handleFullscreen = () => {
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => {})
-        } else {
-            document.exitFullscreen().catch(() => {})
-        }
-    }
+    const handleFullscreen = () => setIsFullscreen(f => !f)
 
     // ── Page selection ──────────────────────────────────────────────────────
     const handlePageSelect = async (markup: Markup) => {
@@ -225,8 +214,11 @@ export function ProjectClient({
 
     return (
         <div
-            className="grid h-full"
-            style={{ gridTemplateColumns: isFullscreen ? "0 1fr 0" : "260px 1fr 320px" }}
+            className={isFullscreen
+                ? "fixed inset-0 z-50 bg-background grid"
+                : "grid h-full"
+            }
+            style={{ gridTemplateColumns: isFullscreen ? "1fr" : "260px 1fr 320px" }}
         >
             {/* LEFT: Pages panel */}
             <aside className={`border-r border-border flex flex-col overflow-hidden ${isFullscreen ? "hidden" : ""}`}>
