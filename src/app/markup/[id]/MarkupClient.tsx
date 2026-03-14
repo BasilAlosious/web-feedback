@@ -9,6 +9,7 @@ import Link from "next/link"
 import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
 import { addComment } from "@/app/actions"
+import { ShareDialog } from "@/components/project/ShareDialog"
 
 interface MarkupClientProps {
     markupId: string
@@ -29,6 +30,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     const [comments, setComments] = useState<Comment[]>(initialComments)
     const [newComment, setNewComment] = useState<{ x: number, y: number } | null>(null)
     const [showThread, setShowThread] = useState(true)
+    const [showShare, setShowShare] = useState(false)
 
     const handleCanvasClick = (x: number, y: number) => {
         if (mode === "comment") {
@@ -70,11 +72,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     }
 
     const handleShare = () => {
-        if (!markup) return
-        const shareUrl = `${window.location.origin}/share/${markup.id}`
-        navigator.clipboard.writeText(shareUrl).then(() => {
-            alert("Share link copied to clipboard!")
-        })
+        setShowShare(true)
     }
 
     const fallbackImage = "https://placehold.co/1920x1080/png?text=Website+Screenshot"
@@ -211,6 +209,14 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     comments={comments}
                     onClose={() => setShowThread(false)}
                     onAddComment={handleAddThreadComment}
+                />
+            )}
+
+            {/* Share Dialog */}
+            {showShare && markup && (
+                <ShareDialog
+                    markupId={markup.id}
+                    onClose={() => setShowShare(false)}
                 />
             )}
         </div>

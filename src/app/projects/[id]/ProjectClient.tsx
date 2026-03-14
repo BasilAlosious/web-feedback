@@ -7,7 +7,15 @@ import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
 import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
 import { CreateMarkupDialog } from "@/components/project/CreateMarkupDialog"
-import { addComment, createMarkup, getComments } from "@/app/actions"
+import { ShareDialog } from "@/components/project/ShareDialog"
+import {
+    addComment,
+    createMarkup,
+    getComments,
+    renameMarkup,
+    deleteMarkup,
+    updateCommentStatus,
+} from "@/app/actions"
 import Link from "next/link"
 
 interface ProjectClientProps {
@@ -18,6 +26,8 @@ interface ProjectClientProps {
     initialComments: Comment[]
 }
 
+type Priority = 'high' | 'medium' | 'low'
+
 const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader()
@@ -26,6 +36,18 @@ const convertFileToBase64 = (file: File): Promise<string> => {
         reader.onerror = reject
     })
 }
+
+const STATUS_OPTIONS = [
+    { label: "Open", value: "open", color: "#050505" },
+    { label: "In Progress", value: "in_progress", color: "#888888" },
+    { label: "Resolved", value: "resolved", color: "#88FF66" },
+]
+
+const PRIORITY_OPTIONS = [
+    { label: "High", value: "high", color: "#EF4444" },
+    { label: "Med", value: "medium", color: "#F59E0B" },
+    { label: "Low", value: "low", color: "#9CA3AF" },
+]
 
 export function ProjectClient({
     projectId,
@@ -43,6 +65,19 @@ export function ProjectClient({
     const [useProxy, setUseProxy] = useState(false)
     const [newComment, setNewComment] = useState<{ x: number; y: number } | null>(null)
 
+    // Filters
+    const [statusFilter, setStatusFilter] = useState<string | null>(null)
+    const [priorityFilter, setPriorityFilter] = useState<Priority | null>(null)
+
+    // Share dialog
+    const [showShare, setShowShare] = useState(false)
+
+    // Rename / delete state
+    const [editingMarkupId, setEditingMarkupId] = useState<string | null>(null)
+    const [editingName, setEditingName] = useState("")
+    const [deletingMarkupId, setDeletingMarkupId] = useState<string | null>(null)
+
+    // ── Page selection ──────────────────────────────────────────────────────
     const handlePageSelect = async (markup: Markup) => {
         setSelectedMarkup(markup)
         setNewComment(null)
@@ -51,13 +86,14 @@ export function ProjectClient({
         setComments(fetched)
     }
 
+    // ── Comment creation ────────────────────────────────────────────────────
     const handleCanvasClick = (x: number, y: number) => {
         if (mode === "comment") {
             setNewComment({ x, y })
         }
     }
 
-    const handleSaveComment = async (content: string) => {
+    const handleSaveComment = async (content: string, priority?: Priority) => {
         if (!newComment || !selectedMarkup) return
         const tempId = Math.random().toString(36).substring(7)
         const optimistic: Comment = {
@@ -68,25 +104,36 @@ export function ProjectClient({
             content,
             author: "Agency User",
             createdAt: new Date().toISOString(),
+            priority,
+            status: 'open',
         }
         setComments(prev => [...prev, optimistic])
         setNewComment(null)
         try {
-            const saved = await addComment(selectedMarkup.id, content, newComment.x, newComment.y, "Agency User")
+            const saved = await addComment(selectedMarkup.id, content, newComment.x, newComment.y, "Agency User", priority)
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch {
             setComments(prev => prev.filter(c => c.id !== tempId))
         }
     }
 
+    // ── Comment status update ───────────────────────────────────────────────
+    const handleUpdateStatus = async (commentId: string, status: 'open' | 'in_progress' | 'resolved') => {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, status } : c))
+        try {
+            await updateCommentStatus(commentId, status)
+        } catch {
+            // revert on failure
+            const fetched = await getComments(selectedMarkup?.id ?? "")
+            setComments(fetched)
+        }
+    }
+
+    // ── Create markup ───────────────────────────────────────────────────────
     const handleCreateMarkup = async (name: string, url: string, type: "website" | "image", file?: File) => {
         let finalUrl = url
         if (type === "image" && file) {
-            try {
-                finalUrl = await convertFileToBase64(file)
-            } catch {
-                return
-            }
+            try { finalUrl = await convertFileToBase64(file) } catch { return }
         }
         const formData = new FormData()
         formData.append("projectId", projectId)
@@ -97,6 +144,56 @@ export function ProjectClient({
         await createMarkup(null, formData)
         window.location.reload()
     }
+
+    // ── Rename markup ───────────────────────────────────────────────────────
+    const handleRenameStart = (m: Markup, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setEditingMarkupId(m.id)
+        setEditingName(m.name)
+        setDeletingMarkupId(null)
+    }
+
+    const handleRenameConfirm = async () => {
+        if (!editingMarkupId || !editingName.trim()) {
+            setEditingMarkupId(null)
+            return
+        }
+        const newName = editingName.trim()
+        setMarkups(prev => prev.map(m => m.id === editingMarkupId ? { ...m, name: newName } : m))
+        if (selectedMarkup?.id === editingMarkupId) {
+            setSelectedMarkup(prev => prev ? { ...prev, name: newName } : prev)
+        }
+        setEditingMarkupId(null)
+        try {
+            await renameMarkup(editingMarkupId, newName)
+        } catch {
+            window.location.reload()
+        }
+    }
+
+    // ── Delete markup ───────────────────────────────────────────────────────
+    const handleDeleteConfirm = async (markupId: string) => {
+        const remaining = markups.filter(m => m.id !== markupId)
+        setMarkups(remaining)
+        setDeletingMarkupId(null)
+        if (selectedMarkup?.id === markupId) {
+            const next = remaining[0]
+            setSelectedMarkup(next)
+            setComments(next ? await getComments(next.id) : [])
+        }
+        try {
+            await deleteMarkup(markupId)
+        } catch {
+            window.location.reload()
+        }
+    }
+
+    // ── Filtered comments ───────────────────────────────────────────────────
+    const visibleComments = comments.filter(c => {
+        const statusMatch = !statusFilter || (c.status ?? 'open') === statusFilter
+        const priorityMatch = !priorityFilter || c.priority === priorityFilter
+        return statusMatch && priorityMatch
+    })
 
     const fallbackImage = "https://placehold.co/1920x1080/png?text=Website+Screenshot"
 
@@ -130,23 +227,79 @@ export function ProjectClient({
                         ) : (
                             <div className="flex flex-col">
                                 {markups.map((m) => (
-                                    <button
+                                    <div
                                         key={m.id}
-                                        onClick={() => handlePageSelect(m)}
-                                        className={`flex items-center gap-2 px-2 py-2 text-left w-full transition-colors ${
+                                        className={`group relative flex items-center gap-1 px-2 py-2 transition-colors ${
                                             selectedMarkup?.id === m.id
                                                 ? "text-foreground font-medium bg-muted"
                                                 : "text-muted-foreground hover:text-foreground"
                                         }`}
                                     >
-                                        <span className="text-xs opacity-60">📄</span>
-                                        <span className="text-sm flex-1 truncate">{m.name}</span>
-                                        {m.commentCount > 0 && (
-                                            <span className="font-mono text-xs text-muted-foreground">
-                                                {m.commentCount}
+                                        {editingMarkupId === m.id ? (
+                                            /* Inline rename input */
+                                            <input
+                                                autoFocus
+                                                value={editingName}
+                                                onChange={(e) => setEditingName(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") handleRenameConfirm()
+                                                    if (e.key === "Escape") setEditingMarkupId(null)
+                                                }}
+                                                onBlur={handleRenameConfirm}
+                                                className="flex-1 bg-transparent border-b border-foreground text-sm font-mono focus:outline-none"
+                                            />
+                                        ) : deletingMarkupId === m.id ? (
+                                            /* Inline delete confirmation */
+                                            <span className="flex-1 font-mono text-xs">
+                                                Delete?{" "}
+                                                <button
+                                                    onClick={() => handleDeleteConfirm(m.id)}
+                                                    className="text-red-500 hover:underline ml-1"
+                                                >
+                                                    [Y]
+                                                </button>
+                                                <button
+                                                    onClick={() => setDeletingMarkupId(null)}
+                                                    className="text-muted-foreground hover:text-foreground ml-1"
+                                                >
+                                                    [N]
+                                                </button>
                                             </span>
+                                        ) : (
+                                            <>
+                                                {/* Page select button */}
+                                                <button
+                                                    onClick={() => handlePageSelect(m)}
+                                                    className="flex items-center gap-2 flex-1 text-left min-w-0"
+                                                >
+                                                    <span className="text-xs opacity-60 flex-shrink-0">📄</span>
+                                                    <span className="text-sm flex-1 truncate">{m.name}</span>
+                                                    {m.commentCount > 0 && (
+                                                        <span className="font-mono text-xs text-muted-foreground flex-shrink-0">
+                                                            {m.commentCount}
+                                                        </span>
+                                                    )}
+                                                </button>
+                                                {/* Hover actions */}
+                                                <div className="opacity-0 group-hover:opacity-100 flex gap-1 flex-shrink-0 transition-opacity">
+                                                    <button
+                                                        onClick={(e) => handleRenameStart(m, e)}
+                                                        className="font-mono text-xs text-muted-foreground hover:text-foreground px-0.5"
+                                                        title="Rename"
+                                                    >
+                                                        [✎]
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setDeletingMarkupId(m.id); setEditingMarkupId(null) }}
+                                                        className="font-mono text-xs text-muted-foreground hover:text-red-500 px-0.5"
+                                                        title="Delete"
+                                                    >
+                                                        [×]
+                                                    </button>
+                                                </div>
+                                            </>
                                         )}
-                                    </button>
+                                    </div>
                                 ))}
                             </div>
                         )}
@@ -159,22 +312,49 @@ export function ProjectClient({
                     <div>
                         <div className="slash-label mb-2">Filter by Status</div>
                         <div className="flex flex-col gap-1">
-                            {[
-                                { label: "Open", color: "#050505" },
-                                { label: "In Progress", color: "#888888" },
-                                { label: "Resolved", color: "#88FF66" },
-                            ].map(({ label, color }) => (
-                                <div
-                                    key={label}
-                                    className="flex items-center gap-2 text-sm text-muted-foreground py-1 cursor-pointer hover:text-foreground"
-                                >
-                                    <span
-                                        className="inline-block w-1.5 h-1.5 flex-shrink-0"
-                                        style={{ background: color }}
-                                    />
-                                    {label}
-                                </div>
-                            ))}
+                            {STATUS_OPTIONS.map(({ label, value, color }) => {
+                                const active = statusFilter === value
+                                return (
+                                    <button
+                                        key={value}
+                                        onClick={() => setStatusFilter(active ? null : value)}
+                                        className={`flex items-center gap-2 text-sm py-1 text-left transition-colors ${
+                                            active ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        <span
+                                            className="inline-block w-1.5 h-1.5 flex-shrink-0"
+                                            style={{ background: active ? color : undefined, border: active ? undefined : `1px solid ${color}` }}
+                                        />
+                                        {label}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Priority filter */}
+                    <div>
+                        <div className="slash-label mb-2">Filter by Priority</div>
+                        <div className="flex flex-col gap-1">
+                            {PRIORITY_OPTIONS.map(({ label, value, color }) => {
+                                const active = priorityFilter === value
+                                return (
+                                    <button
+                                        key={value}
+                                        onClick={() => setPriorityFilter(active ? null : value as Priority)}
+                                        className={`flex items-center gap-2 text-sm py-1 text-left transition-colors ${
+                                            active ? "text-foreground font-medium" : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        <span
+                                            className="inline-block w-1.5 h-1.5 flex-shrink-0"
+                                            style={{ background: active ? color : undefined, border: active ? undefined : `1px solid ${color}` }}
+                                        />
+                                        {label}
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
                 </div>
@@ -212,6 +392,17 @@ export function ProjectClient({
                                 {m}
                             </button>
                         ))}
+                        {selectedMarkup && (
+                            <>
+                                <span className="text-muted-foreground">|</span>
+                                <button
+                                    onClick={() => setShowShare(true)}
+                                    className="font-mono text-xs uppercase text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                    [S] Share
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -258,9 +449,9 @@ export function ProjectClient({
                                 </div>
                             )}
 
-                            {/* Comment pins */}
+                            {/* Comment pins — filtered */}
                             <div className="absolute inset-0 z-20 pointer-events-none">
-                                {comments.map((comment, i) => (
+                                {visibleComments.map((comment, i) => (
                                     <div key={comment.id} className="pointer-events-auto">
                                         <CommentPin
                                             x={comment.x}
@@ -268,6 +459,7 @@ export function ProjectClient({
                                             number={i + 1}
                                             author={comment.author}
                                             content={comment.content}
+                                            priority={comment.priority}
                                         />
                                     </div>
                                 ))}
@@ -276,7 +468,7 @@ export function ProjectClient({
                                         <CommentPin
                                             x={newComment.x}
                                             y={newComment.y}
-                                            number={comments.length + 1}
+                                            number={visibleComments.length + 1}
                                             isNew
                                             onSave={handleSaveComment}
                                             onCancel={() => setNewComment(null)}
@@ -316,6 +508,9 @@ export function ProjectClient({
                     </span>
                     <span className="font-mono text-xs text-muted-foreground">
                         {mode.toUpperCase()} | {viewport.toUpperCase()}
+                        {(statusFilter || priorityFilter) && (
+                            <span className="text-foreground ml-2">[FILTERED]</span>
+                        )}
                     </span>
                 </div>
             </section>
@@ -324,14 +519,23 @@ export function ProjectClient({
             {selectedMarkup ? (
                 <CommentThread
                     markupId={selectedMarkup.id}
-                    comments={comments}
+                    comments={visibleComments}
                     onClose={() => {}}
                     onAddComment={() => {}}
+                    onUpdateStatus={handleUpdateStatus}
                 />
             ) : (
                 <aside className="border-l border-border flex items-center justify-center">
                     <p className="font-mono text-xs text-muted-foreground uppercase">No page selected</p>
                 </aside>
+            )}
+
+            {/* Share dialog */}
+            {showShare && selectedMarkup && (
+                <ShareDialog
+                    markupId={selectedMarkup.id}
+                    onClose={() => setShowShare(false)}
+                />
             )}
         </div>
     )

@@ -51,7 +51,14 @@ export async function getComments(markupId: string): Promise<Comment[]> {
     return db.getComments(markupId)
 }
 
-export async function addComment(markupId: string, content: string, x: number, y: number, author: string = 'Agency User') {
+export async function addComment(
+    markupId: string,
+    content: string,
+    x: number,
+    y: number,
+    author: string = 'Agency User',
+    priority?: 'high' | 'medium' | 'low'
+) {
     const newComment: Comment = {
         id: Math.random().toString(36).substring(7),
         markupId,
@@ -60,9 +67,29 @@ export async function addComment(markupId: string, content: string, x: number, y
         content,
         author,
         createdAt: new Date().toISOString(),
+        priority,
+        status: 'open',
     }
 
     db.addComment(newComment)
-    revalidatePath(`/projects/[id]/markup/${markupId}`, 'page') // This might need specific path logic or use tag
     return newComment
+}
+
+export async function renameMarkup(markupId: string, name: string) {
+    return db.updateMarkup(markupId, { name })
+}
+
+export async function deleteMarkup(markupId: string) {
+    const markup = db.getMarkup(markupId)
+    if (!markup) throw new Error('Markup not found')
+    db.deleteMarkup(markupId)
+    revalidatePath(`/projects/${markup.projectId}`)
+}
+
+export async function updateCommentStatus(commentId: string, status: 'open' | 'in_progress' | 'resolved') {
+    return db.updateComment(commentId, { status })
+}
+
+export async function getCommentsForProject(projectId: string) {
+    return db.getCommentsForProject(projectId)
 }

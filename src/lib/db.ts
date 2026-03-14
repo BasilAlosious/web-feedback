@@ -29,6 +29,8 @@ export interface Comment {
     content: string
     author: string
     createdAt: string
+    priority?: 'high' | 'medium' | 'low'
+    status?: 'open' | 'in_progress' | 'resolved'
 }
 
 interface DB {
@@ -77,6 +79,34 @@ export const db = {
         return markup
     },
 
+    updateMarkup: (id: string, patch: Partial<Markup>) => {
+        const data = readDB()
+        const idx = data.markups.findIndex(m => m.id === id)
+        if (idx === -1) throw new Error('Markup not found')
+        data.markups[idx] = { ...data.markups[idx], ...patch }
+        writeDB(data)
+        return data.markups[idx]
+    },
+    deleteMarkup: (id: string) => {
+        const data = readDB()
+        const markup = data.markups.find(m => m.id === id)
+        if (markup) {
+            const project = data.projects.find(p => p.id === markup.projectId)
+            if (project) project.markupCount = Math.max(0, project.markupCount - 1)
+        }
+        data.markups = data.markups.filter(m => m.id !== id)
+        data.comments = data.comments.filter(c => c.markupId !== id)
+        writeDB(data)
+    },
+
+    getCommentsForProject: (projectId: string) => {
+        const data = readDB()
+        const markupIds = new Set(
+            data.markups.filter(m => m.projectId === projectId).map(m => m.id)
+        )
+        return data.comments.filter(c => markupIds.has(c.markupId))
+    },
+
     getComments: (markupId: string) => readDB().comments.filter(c => c.markupId === markupId),
     addComment: (comment: Comment) => {
         const data = readDB()
@@ -86,5 +116,13 @@ export const db = {
         if (markup) markup.commentCount++
         writeDB(data)
         return comment
-    }
+    },
+    updateComment: (id: string, patch: Partial<Comment>) => {
+        const data = readDB()
+        const idx = data.comments.findIndex(c => c.id === id)
+        if (idx === -1) throw new Error('Comment not found')
+        data.comments[idx] = { ...data.comments[idx], ...patch }
+        writeDB(data)
+        return data.comments[idx]
+    },
 }
