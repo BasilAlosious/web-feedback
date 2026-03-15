@@ -82,10 +82,14 @@ export function ProjectClient({
     const [isFullscreen, setIsFullscreen] = useState(false)
     const handleFullscreen = () => setIsFullscreen(f => !f)
 
+    // Comments panel visibility
+    const [showComments, setShowComments] = useState(true)
+
     // ── Page selection ──────────────────────────────────────────────────────
     const handlePageSelect = async (markup: Markup) => {
         setSelectedMarkup(markup)
         setNewComment(null)
+        setShowComments(true)
         const fetched = await getComments(markup.id)
         setComments(fetched)
     }
@@ -218,7 +222,7 @@ export function ProjectClient({
                 ? "fixed inset-0 z-50 bg-background grid"
                 : "grid h-full"
             }
-            style={{ gridTemplateColumns: isFullscreen ? "1fr" : "260px 1fr 320px" }}
+            style={{ gridTemplateColumns: isFullscreen ? "1fr" : showComments && selectedMarkup ? "260px 1fr 320px" : "260px 1fr" }}
         >
             {/* LEFT: Pages panel */}
             <aside className={`border-r border-border flex flex-col overflow-hidden ${isFullscreen ? "hidden" : ""}`}>
@@ -531,21 +535,29 @@ export function ProjectClient({
             </section>
 
             {/* RIGHT: Comments panel */}
-            {selectedMarkup && !isFullscreen ? (
+            {selectedMarkup && !isFullscreen && showComments ? (
                 <CommentThread
                     markupId={selectedMarkup.id}
                     comments={visibleComments}
-                    onClose={() => {}}
+                    onClose={() => setShowComments(false)}
                     onAddComment={() => {}}
                     onUpdateStatus={handleUpdateStatus}
                     onUpdatePriority={handleUpdatePriority}
                 />
             ) : (
-                !isFullscreen && (
+                !isFullscreen && selectedMarkup && !showComments ? (
+                    <button
+                        onClick={() => setShowComments(true)}
+                        className="fixed right-0 top-1/2 -translate-y-1/2 z-40 border border-border bg-background px-2 py-4 font-mono text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground hover:border-foreground transition-colors"
+                        style={{ writingMode: "vertical-rl" }}
+                    >
+                        [→] Comments
+                    </button>
+                ) : !isFullscreen && !selectedMarkup ? (
                     <aside className="border-l border-border flex items-center justify-center">
                         <p className="font-mono text-xs text-muted-foreground uppercase">No page selected</p>
                     </aside>
-                )
+                ) : null
             )}
 
             {/* Share dialog */}
