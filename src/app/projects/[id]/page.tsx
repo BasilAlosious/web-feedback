@@ -9,10 +9,11 @@ interface ProjectPageProps {
 
 export default async function ProjectPage({ params }: ProjectPageProps) {
     const { id } = await params
-    const project = db.getProjects().find(p => p.id === id)
-    const markups = db.getMarkups(id)
+    const projects = await db.getProjects()
+    const project = projects.find(p => p.id === id)
+    const markups = await db.getMarkups(id)
     const firstMarkup = markups[0]
-    const initialComments = firstMarkup ? db.getComments(firstMarkup.id) : []
+    const initialComments = firstMarkup ? await db.getComments(firstMarkup.id) : []
 
     return (
         <ProjectClient

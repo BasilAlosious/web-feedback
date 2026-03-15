@@ -8,11 +8,14 @@ interface BoardPageProps {
 
 export default async function BoardPage({ params }: BoardPageProps) {
     const { id } = await params
-    const project = db.getProjects().find(p => p.id === id)
+    const projects = await db.getProjects()
+    const project = projects.find(p => p.id === id)
     if (!project) notFound()
 
-    const markups = db.getMarkups(id)
-    const allComments = db.getCommentsForProject(id)
+    const [markups, allComments] = await Promise.all([
+        db.getMarkups(id),
+        db.getCommentsForProject(id),
+    ])
 
     // Build a lookup: markupId → markup name
     const markupNames: Record<string, string> = {}

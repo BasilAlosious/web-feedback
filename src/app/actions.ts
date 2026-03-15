@@ -2,7 +2,6 @@
 
 import { revalidatePath } from 'next/cache'
 import { db, Project, Markup, Comment } from '@/lib/db'
-import { redirect } from 'next/navigation'
 
 export async function createProject(formData: FormData) {
     const title = formData.get('title') as string
@@ -15,10 +14,10 @@ export async function createProject(formData: FormData) {
         name: title,
         url,
         markupCount: 0,
-        updatedAt: 'Just now', // ideally use proper date formatting
+        updatedAt: new Date().toISOString(),
     }
 
-    db.addProject(newProject)
+    await db.addProject(newProject)
     revalidatePath('/')
     return { success: true }
 }
@@ -27,7 +26,7 @@ export async function createMarkup(prevState: any, formData: FormData) {
     const projectId = formData.get('projectId') as string
     const type = formData.get('type') as 'website' | 'image'
     const name = formData.get('name') as string
-    const url = formData.get('url') as string // For image, this will be base64 string
+    const url = formData.get('url') as string
     const viewport = formData.get('viewport') as 'desktop' | 'tablet' | 'mobile' || 'desktop'
 
     if (!projectId || !name || !url) return { error: 'Missing fields' }
@@ -42,7 +41,7 @@ export async function createMarkup(prevState: any, formData: FormData) {
         type,
     }
 
-    db.addMarkup(newMarkup)
+    await db.addMarkup(newMarkup)
     revalidatePath(`/projects/${projectId}`)
     return { success: true }
 }
@@ -71,7 +70,7 @@ export async function addComment(
         status: 'open',
     }
 
-    db.addComment(newComment)
+    await db.addComment(newComment)
     return newComment
 }
 
@@ -80,9 +79,9 @@ export async function renameMarkup(markupId: string, name: string) {
 }
 
 export async function deleteMarkup(markupId: string) {
-    const markup = db.getMarkup(markupId)
+    const markup = await db.getMarkup(markupId)
     if (!markup) throw new Error('Markup not found')
-    db.deleteMarkup(markupId)
+    await db.deleteMarkup(markupId)
     revalidatePath(`/projects/${markup.projectId}`)
 }
 

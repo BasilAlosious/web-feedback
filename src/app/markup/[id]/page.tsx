@@ -10,8 +10,8 @@ interface MarkupPageProps {
 
 export default async function MarkupPage({ params }: MarkupPageProps) {
     const { id } = await params
-    const markup = db.getMarkup(id)
-    const comments = db.getComments(id)
+    const markup = await db.getMarkup(id)
+    const comments = await db.getComments(id)
 
     if (!markup) {
         notFound()

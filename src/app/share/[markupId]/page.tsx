@@ -10,8 +10,8 @@ interface SharePageProps {
 
 export default async function SharePage({ params }: SharePageProps) {
     const { markupId } = await params
-    const markup = db.getMarkup(markupId)
-    const comments = db.getComments(markupId)
+    const markup = await db.getMarkup(markupId)
+    const comments = await db.getComments(markupId)
 
     if (!markup) {
         notFound()

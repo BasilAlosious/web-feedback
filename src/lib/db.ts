@@ -1,7 +1,4 @@
-import fs from 'fs'
-import path from 'path'
-
-const DB_PATH = path.join(process.cwd(), 'data', 'db.json')
+import { sql } from '@vercel/postgres'
 
 export interface Project {
     id: string
@@ -33,96 +30,91 @@ export interface Comment {
     status?: 'open' | 'in_progress' | 'resolved'
 }
 
-interface DB {
-    projects: Project[]
-    markups: Markup[]
-    comments: Comment[]
-}
-
-const initialDB: DB = {
-    projects: [],
-    markups: [],
-    comments: []
-}
-
-function readDB(): DB {
-    if (!fs.existsSync(DB_PATH)) {
-        fs.writeFileSync(DB_PATH, JSON.stringify(initialDB, null, 2))
-        return initialDB
-    }
-    const data = fs.readFileSync(DB_PATH, 'utf-8')
-    return JSON.parse(data)
-}
-
-function writeDB(db: DB) {
-    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2))
-}
+const SELECT_PROJECT = `id, name, url, markup_count AS "markupCount", updated_at AS "updatedAt"`
+const SELECT_MARKUP  = `id, project_id AS "projectId", name, url, viewport, comment_count AS "commentCount", type`
+const SELECT_COMMENT = `id, markup_id AS "markupId", x, y, content, author, created_at AS "createdAt", priority, status`
 
 export const db = {
-    getProjects: () => readDB().projects,
-    addProject: (project: Project) => {
-        const data = readDB()
-        data.projects.unshift(project)
-        writeDB(data)
+    getProjects: async (): Promise<Project[]> => {
+        const { rows } = await sql.query(`SELECT ${SELECT_PROJECT} FROM projects ORDER BY updated_at DESC`)
+        return rows as Project[]
+    },
+
+    addProject: async (project: Project): Promise<Project> => {
+        await sql`INSERT INTO projects (id, name, url, markup_count, updated_at)
+                  VALUES (${project.id}, ${project.name}, ${project.url}, ${project.markupCount}, ${project.updatedAt})`
         return project
     },
 
-    getMarkups: (projectId: string) => readDB().markups.filter(m => m.projectId === projectId),
-    getMarkup: (markupId: string) => readDB().markups.find(m => m.id === markupId),
-    addMarkup: (markup: Markup) => {
-        const data = readDB()
-        data.markups.unshift(markup)
-        // Update project count
-        const project = data.projects.find(p => p.id === markup.projectId)
-        if (project) project.markupCount++
-        writeDB(data)
+    getMarkups: async (projectId: string): Promise<Markup[]> => {
+        const { rows } = await sql.query(`SELECT ${SELECT_MARKUP} FROM markups WHERE project_id = $1`, [projectId])
+        return rows as Markup[]
+    },
+
+    getMarkup: async (markupId: string): Promise<Markup | undefined> => {
+        const { rows } = await sql.query(`SELECT ${SELECT_MARKUP} FROM markups WHERE id = $1`, [markupId])
+        return rows[0] as Markup | undefined
+    },
+
+    addMarkup: async (markup: Markup): Promise<Markup> => {
+        await sql`INSERT INTO markups (id, project_id, name, url, viewport, comment_count, type)
+                  VALUES (${markup.id}, ${markup.projectId}, ${markup.name}, ${markup.url}, ${markup.viewport}, ${markup.commentCount}, ${markup.type})`
+        await sql`UPDATE projects SET markup_count = markup_count + 1 WHERE id = ${markup.projectId}`
         return markup
     },
 
-    updateMarkup: (id: string, patch: Partial<Markup>) => {
-        const data = readDB()
-        const idx = data.markups.findIndex(m => m.id === id)
-        if (idx === -1) throw new Error('Markup not found')
-        data.markups[idx] = { ...data.markups[idx], ...patch }
-        writeDB(data)
-        return data.markups[idx]
-    },
-    deleteMarkup: (id: string) => {
-        const data = readDB()
-        const markup = data.markups.find(m => m.id === id)
-        if (markup) {
-            const project = data.projects.find(p => p.id === markup.projectId)
-            if (project) project.markupCount = Math.max(0, project.markupCount - 1)
-        }
-        data.markups = data.markups.filter(m => m.id !== id)
-        data.comments = data.comments.filter(c => c.markupId !== id)
-        writeDB(data)
+    updateMarkup: async (id: string, patch: Partial<Markup>): Promise<Markup> => {
+        if (patch.name      !== undefined) await sql`UPDATE markups SET name     = ${patch.name}     WHERE id = ${id}`
+        if (patch.url       !== undefined) await sql`UPDATE markups SET url      = ${patch.url}      WHERE id = ${id}`
+        if (patch.viewport  !== undefined) await sql`UPDATE markups SET viewport = ${patch.viewport} WHERE id = ${id}`
+        if (patch.type      !== undefined) await sql`UPDATE markups SET type     = ${patch.type}     WHERE id = ${id}`
+        const { rows } = await sql.query(`SELECT ${SELECT_MARKUP} FROM markups WHERE id = $1`, [id])
+        if (!rows[0]) throw new Error('Markup not found')
+        return rows[0] as Markup
     },
 
-    getCommentsForProject: (projectId: string) => {
-        const data = readDB()
-        const markupIds = new Set(
-            data.markups.filter(m => m.projectId === projectId).map(m => m.id)
+    deleteMarkup: async (id: string): Promise<void> => {
+        const { rows } = await sql.query(`SELECT project_id FROM markups WHERE id = $1`, [id])
+        if (!rows[0]) return
+        await sql`DELETE FROM markups WHERE id = ${id}`
+        await sql`UPDATE projects SET markup_count = GREATEST(markup_count - 1, 0) WHERE id = ${rows[0].project_id}`
+    },
+
+    getComments: async (markupId: string): Promise<Comment[]> => {
+        const { rows } = await sql.query(
+            `SELECT ${SELECT_COMMENT} FROM comments WHERE markup_id = $1 ORDER BY created_at ASC`,
+            [markupId]
         )
-        return data.comments.filter(c => markupIds.has(c.markupId))
+        return rows as Comment[]
     },
 
-    getComments: (markupId: string) => readDB().comments.filter(c => c.markupId === markupId),
-    addComment: (comment: Comment) => {
-        const data = readDB()
-        data.comments.push(comment)
-        // Update markup count
-        const markup = data.markups.find(m => m.id === comment.markupId)
-        if (markup) markup.commentCount++
-        writeDB(data)
+    addComment: async (comment: Comment): Promise<Comment> => {
+        await sql`INSERT INTO comments (id, markup_id, x, y, content, author, created_at, priority, status)
+                  VALUES (${comment.id}, ${comment.markupId}, ${comment.x}, ${comment.y},
+                          ${comment.content}, ${comment.author}, ${comment.createdAt},
+                          ${comment.priority ?? null}, ${comment.status ?? 'open'})`
+        await sql`UPDATE markups SET comment_count = comment_count + 1 WHERE id = ${comment.markupId}`
         return comment
     },
-    updateComment: (id: string, patch: Partial<Comment>) => {
-        const data = readDB()
-        const idx = data.comments.findIndex(c => c.id === id)
-        if (idx === -1) throw new Error('Comment not found')
-        data.comments[idx] = { ...data.comments[idx], ...patch }
-        writeDB(data)
-        return data.comments[idx]
+
+    updateComment: async (id: string, patch: Partial<Comment>): Promise<Comment> => {
+        if (patch.status   !== undefined) await sql`UPDATE comments SET status   = ${patch.status}          WHERE id = ${id}`
+        if (patch.priority !== undefined) await sql`UPDATE comments SET priority = ${patch.priority ?? null} WHERE id = ${id}`
+        const { rows } = await sql.query(`SELECT ${SELECT_COMMENT} FROM comments WHERE id = $1`, [id])
+        if (!rows[0]) throw new Error('Comment not found')
+        return rows[0] as Comment
+    },
+
+    getCommentsForProject: async (projectId: string): Promise<Comment[]> => {
+        const { rows } = await sql.query(
+            `SELECT c.id, c.markup_id AS "markupId", c.x, c.y, c.content, c.author,
+                    c.created_at AS "createdAt", c.priority, c.status
+             FROM comments c
+             INNER JOIN markups m ON c.markup_id = m.id
+             WHERE m.project_id = $1
+             ORDER BY c.created_at ASC`,
+            [projectId]
+        )
+        return rows as Comment[]
     },
 }
