@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Maximize, Minimize } from "lucide-react"
 import { Markup, Comment, Project } from "@/lib/db"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
@@ -9,6 +9,7 @@ import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
 import { CreateMarkupDialog } from "@/components/project/CreateMarkupDialog"
 import { ShareDialog } from "@/components/project/ShareDialog"
+import { ProjectHeader } from "@/components/layout/ProjectHeader"
 import {
     addComment,
     createMarkup,
@@ -84,6 +85,37 @@ export function ProjectClient({
 
     // Comments panel visibility
     const [showComments, setShowComments] = useState(true)
+
+    // ── Keyboard Shortcuts ──────────────────────────────────────────────────
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't trigger shortcuts when typing in input fields
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+                return
+            }
+
+            // [F] - Toggle fullscreen
+            if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey) {
+                e.preventDefault()
+                setIsFullscreen(f => !f)
+            }
+
+            // [Tab] - Switch mode between browse and comment
+            if (e.key === 'Tab') {
+                e.preventDefault()
+                setMode(m => m === "browse" ? "comment" : "browse")
+            }
+
+            // [Esc] - Exit fullscreen
+            if (e.key === 'Escape' && isFullscreen) {
+                e.preventDefault()
+                setIsFullscreen(false)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [isFullscreen])
 
     // ── Page selection ──────────────────────────────────────────────────────
     const handlePageSelect = async (markup: Markup) => {
@@ -217,29 +249,35 @@ export function ProjectClient({
     const fallbackImage = "https://placehold.co/1920x1080/png?text=Website+Screenshot"
 
     return (
-        <div
-            className={isFullscreen
-                ? "fixed inset-0 z-50 bg-background grid"
-                : "grid h-full"
-            }
-            style={{ gridTemplateColumns: isFullscreen ? "1fr" : showComments && selectedMarkup ? "260px 1fr 320px" : "260px 1fr" }}
-        >
+        <div className="flex flex-col h-full">
+            {/* Project Context Header */}
+            {!isFullscreen && project && (
+                <ProjectHeader
+                    projectName={project.name}
+                    currentView="canvas"
+                    projectId={projectId}
+                />
+            )}
+
+            <div
+                className={isFullscreen
+                    ? "fixed inset-0 z-50 bg-background grid"
+                    : "grid flex-1"
+                }
+                style={{ gridTemplateColumns: isFullscreen ? "1fr" : showComments && selectedMarkup ? "260px 1fr 320px" : "260px 1fr" }}
+            >
             {/* LEFT: Pages panel */}
-            <aside className={`border-r border-border flex flex-col overflow-hidden ${isFullscreen ? "hidden" : ""}`}>
-                {/* Project header */}
+            <aside className={`border-r border-border flex flex-col overflow-hidden bg-white ${isFullscreen ? "hidden" : ""}`}>
+                {/* Sidebar header */}
                 <div className="p-5 border-b border-border flex-shrink-0">
-                    <Link href="/" className="nav-item block mb-3">
-                        <span className="text-foreground">[←]</span> Back
+                    <Link
+                        href="/"
+                        className="flex items-center gap-2 mb-4 font-mono text-[11px] transition-colors"
+                        style={{ color: "#888888" }}
+                    >
+                        <span>←</span>
+                        <span>Back to Projects</span>
                     </Link>
-                    <h1 className="page-title">
-                        {project?.name || "Project"}
-                        <sup className="count-superscript">{markups.length}</sup>
-                    </h1>
-                    {project?.url && (
-                        <p className="font-mono text-xs text-muted-foreground uppercase mt-1 truncate">
-                            {project.url}
-                        </p>
-                    )}
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-6">
@@ -385,47 +423,40 @@ export function ProjectClient({
             </aside>
 
             {/* CENTER: Preview canvas */}
-            <section className="flex flex-col overflow-hidden" style={{ background: "#F0F0F0" }}>
+            <section className="flex flex-col overflow-hidden bg-white">
                 {/* Toolbar */}
-                <div className={`h-10 border-b border-border flex items-center px-4 gap-4 bg-background flex-shrink-0 ${isFullscreen ? "hidden" : ""}`}>
-                    <span className="font-mono text-xs text-muted-foreground uppercase">
-                        Viewport:{" "}
-                        {viewport === "desktop" ? "1440px" : viewport === "tablet" ? "768px" : "390px"}
-                    </span>
-                    <div className="ml-auto flex items-center gap-3">
-                        {(["desktop", "tablet", "mobile"] as const).map((v) => (
+                <div
+                    className="h-12 flex items-center justify-between px-4 border-b flex-shrink-0"
+                    style={{ backgroundColor: "#FFFFFF", borderColor: "#E0E0E0" }}
+                >
+                    {/* Left - Viewport controls */}
+                    <div className="flex items-center gap-3 font-mono text-[9px]" style={{ color: "#888888" }}>
+                        <span style={{ color: "#888888" }}>
+                            {viewport === "desktop" ? "1440x900" : viewport === "tablet" ? "768x1024" : "390x844"}
+                        </span>
+                        <span>-</span>
+                        <span style={{ color: "#050505", fontWeight: 600 }}>100%</span>
+                        <span>+</span>
+                    </div>
+
+                    {/* Right - Mode toggle and Fullscreen */}
+                    <div className="flex items-center gap-3">
+                        {!isFullscreen ? (
                             <button
-                                key={v}
-                                onClick={() => setViewport(v)}
-                                className={`font-mono text-xs uppercase transition-colors ${
-                                    viewport === v ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                                }`}
+                                onClick={handleFullscreen}
+                                className="px-3 py-1.5 font-mono text-[9px] font-semibold uppercase transition-colors"
+                                style={{ backgroundColor: "#F5F5F5", color: "#888888" }}
                             >
-                                [{v[0].toUpperCase()}] {v}
+                                FULLSCREEN
                             </button>
-                        ))}
-                        <span className="text-muted-foreground">|</span>
-                        {(["browse", "comment"] as const).map((m) => (
+                        ) : (
                             <button
-                                key={m}
-                                onClick={() => setMode(m)}
-                                className={`font-mono text-xs uppercase transition-colors ${
-                                    mode === m ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                                }`}
+                                onClick={handleFullscreen}
+                                className="px-3 py-1.5 font-mono text-[9px] font-semibold uppercase"
+                                style={{ backgroundColor: "#88FF66", color: "#050505" }}
                             >
-                                {m}
+                                EXIT FULLSCREEN
                             </button>
-                        ))}
-                        {selectedMarkup && (
-                            <>
-                                <span className="text-muted-foreground">|</span>
-                                <button
-                                    onClick={() => setShowShare(true)}
-                                    className="font-mono text-xs uppercase text-muted-foreground hover:text-foreground transition-colors"
-                                >
-                                    [S] Share
-                                </button>
-                            </>
                         )}
                     </div>
                 </div>
@@ -519,18 +550,24 @@ export function ProjectClient({
                     </div>
                 )}
 
-                {/* Footer */}
-                <div className={`h-8 border-t border-border px-4 flex items-center justify-between flex-shrink-0 bg-background ${isFullscreen ? "hidden" : ""}`}>
-                    <span className="font-mono text-xs text-muted-foreground">
-                        <span className="text-foreground">[Click]</span> Add Comment{" "}
-                        <span className="text-foreground">[B/C]</span> Mode
-                    </span>
-                    <span className="font-mono text-xs text-muted-foreground">
-                        {mode.toUpperCase()} | {viewport.toUpperCase()}
-                        {(statusFilter || priorityFilter) && (
-                            <span className="text-foreground ml-2">[FILTERED]</span>
-                        )}
-                    </span>
+                {/* Status Bar */}
+                <div
+                    className="h-8 border-t flex items-center justify-between px-5 shrink-0"
+                    style={{ backgroundColor: "#F5F5F5", borderColor: "#E0E0E0" }}
+                >
+                    {/* Left - Mode Indicator */}
+                    <div className="flex items-center gap-3">
+                        <span className="font-mono text-[9px] font-bold" style={{ color: "#050505" }}>
+                            [{mode === "comment" ? "COMMENT MODE" : "BROWSE MODE"}]
+                        </span>
+                    </div>
+
+                    {/* Right - Keyboard Hints */}
+                    <div className="flex items-center gap-4 font-mono text-[8px]" style={{ color: "#888888" }}>
+                        <span>[TAB] Switch Mode</span>
+                        <span>[Cmd+K] Search</span>
+                        <span>{isFullscreen ? "[Esc] Exit Fullscreen" : "[F] Fullscreen"}</span>
+                    </div>
                 </div>
             </section>
 
@@ -567,6 +604,7 @@ export function ProjectClient({
                     onClose={() => setShowShare(false)}
                 />
             )}
+            </div>
         </div>
     )
 }

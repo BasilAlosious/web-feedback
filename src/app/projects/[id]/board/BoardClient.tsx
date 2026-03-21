@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { Comment } from "@/lib/db"
 import { updateCommentStatus, updateCommentPriority } from "@/app/actions"
+import { ProjectHeader } from "@/components/layout/ProjectHeader"
 
 interface BoardClientProps {
     projectId: string
@@ -11,10 +12,10 @@ interface BoardClientProps {
     initialComments: Comment[]
 }
 
-const COLUMNS: { key: NonNullable<Comment["status"]>; label: string; indicator: string }[] = [
-    { key: "open",        label: "OPEN",        indicator: "○" },
-    { key: "in_progress", label: "IN PROGRESS", indicator: "~" },
-    { key: "resolved",    label: "RESOLVED",    indicator: "✓" },
+const COLUMNS: { key: NonNullable<Comment["status"]>; label: string }[] = [
+    { key: "open",        label: "NEW" },
+    { key: "in_progress", label: "IN PROGRESS" },
+    { key: "resolved",    label: "RESOLVED" },
 ]
 
 const NEXT_STATUS: Record<string, NonNullable<Comment["status"]>> = {
@@ -113,62 +114,55 @@ export function BoardClient({ projectId, projectName, markupNames, initialCommen
     const commentIndex = (id: string) => comments.findIndex(c => c.id === id) + 1
 
     return (
-        <div className="flex flex-col h-full bg-background overflow-hidden">
-            {/* Board Header */}
-            <div className="h-10 border-b border-border flex items-center px-4 gap-3 flex-shrink-0">
-                <span className="font-mono text-xs text-muted-foreground uppercase">[ BOARD ] /</span>
-                <span className="font-mono text-xs text-foreground uppercase">{projectName}</span>
-                <span className="font-mono text-xs text-muted-foreground ml-auto">
-                    {comments.length} comment{comments.length !== 1 ? "s" : ""}
-                </span>
-                <span className="font-mono text-xs text-muted-foreground border-l border-border pl-3">
-                    drag cards to move · click priority to cycle
-                </span>
-            </div>
+        <div className="flex flex-col h-full" style={{ backgroundColor: "#F5F5F5" }}>
+            {/* Project Context Header */}
+            <ProjectHeader
+                projectName={projectName}
+                currentView="board"
+                projectId={projectId}
+            />
 
             {/* Kanban Columns */}
-            <div className="flex-1 overflow-x-auto overflow-y-hidden">
-                <div className="flex h-full gap-0 min-w-[720px]">
-                    {COLUMNS.map((col, colIdx) => {
+            <div className="flex-1 p-8 overflow-hidden">
+                <div className="flex h-full gap-6">
+                    {COLUMNS.map((col) => {
                         const colComments = getColumnComments(col.key)
                         const isDropTarget = dragOverCol === col.key
+                        const isResolved = col.key === "resolved"
 
                         return (
                             <div
                                 key={col.key}
-                                className={`flex flex-col flex-1 overflow-hidden transition-colors
-                                    ${colIdx === 0 ? "border-l border-border" : ""}
-                                    border-r border-border
-                                    ${isDropTarget ? "bg-muted/40" : ""}
-                                `}
+                                className="flex flex-col flex-1 overflow-hidden transition-colors"
                                 onDragOver={(e) => handleDragOver(e, col.key)}
                                 onDragLeave={() => setDragOverCol(null)}
                                 onDrop={(e) => handleDrop(e, col.key)}
                             >
                                 {/* Column Header */}
-                                <div className={`h-10 border-b flex items-center px-4 gap-2 flex-shrink-0 bg-card
-                                    ${isDropTarget ? "border-border" : "border-border"}`}>
-                                    <span className={`font-mono text-xs ${COLUMN_COLOR[col.key]}`}>
-                                        [{col.indicator}]
-                                    </span>
-                                    <span className="font-mono text-xs uppercase text-foreground">
-                                        {col.label}
-                                    </span>
-                                    <span className="font-mono text-xs text-muted-foreground ml-auto">
-                                        {colComments.length}
-                                    </span>
+                                <div
+                                    className="h-10 flex items-center justify-center shrink-0 font-mono text-[11px] font-semibold"
+                                    style={{
+                                        backgroundColor: isResolved ? "#88FF66" : "#FFFFFF",
+                                        border: isResolved ? "1px solid #88FF66" : "1px solid #E0E0E0",
+                                        color: "#050505"
+                                    }}
+                                >
+                                    {col.label}
                                 </div>
 
                                 {/* Drop hint when dragging */}
                                 {isDropTarget && (
-                                    <div className="mx-3 mt-3 h-1 bg-foreground/20 border border-dashed border-foreground/40 flex-shrink-0" />
+                                    <div className="mx-3 mt-4 h-1 border border-dashed" style={{ borderColor: "#88FF66" }} />
                                 )}
 
                                 {/* Cards */}
-                                <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+                                <div className="flex-1 overflow-y-auto mt-4 flex flex-col gap-2">
                                     {colComments.length === 0 && !isDropTarget && (
-                                        <div className="flex items-center justify-center h-16 border border-dashed border-border">
-                                            <span className="font-mono text-xs text-muted-foreground uppercase">
+                                        <div
+                                            className="flex items-center justify-center h-16 border border-dashed"
+                                            style={{ borderColor: "#E0E0E0" }}
+                                        >
+                                            <span className="font-mono text-xs uppercase" style={{ color: "#888888" }}>
                                                 — empty —
                                             </span>
                                         </div>
@@ -178,11 +172,17 @@ export function BoardClient({ projectId, projectName, markupNames, initialCommen
                                         const pageName = markupNames[comment.markupId] ?? "unknown"
                                         const num = commentIndex(comment.id)
                                         const priCfg = comment.priority ? PRIORITY_CONFIG[comment.priority] : null
-                                        const date = new Date(comment.createdAt).toLocaleDateString("en-US", {
-                                            month: "short",
-                                            day: "numeric",
-                                        })
-                                        const isResolved = col.key === "resolved"
+
+                                        // Format time as relative (e.g., "2h ago")
+                                        const formatTime = (dateString: string) => {
+                                            const date = new Date(dateString)
+                                            const now = new Date()
+                                            const diff = now.getTime() - date.getTime()
+                                            const hours = Math.floor(diff / 3600000)
+                                            const days = Math.floor(diff / 86400000)
+                                            if (hours < 24) return `${hours}h ago`
+                                            return `${days}d ago`
+                                        }
 
                                         return (
                                             <div
@@ -190,54 +190,30 @@ export function BoardClient({ projectId, projectName, markupNames, initialCommen
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, comment.id)}
                                                 onDragEnd={handleDragEnd}
-                                                className="border border-border bg-card p-3 flex flex-col gap-2
-                                                    hover:border-foreground transition-colors cursor-grab active:cursor-grabbing
-                                                    select-none"
+                                                className="p-4 flex flex-col gap-2 cursor-grab active:cursor-grabbing select-none transition-colors"
+                                                style={{
+                                                    backgroundColor: "#FFFFFF",
+                                                    border: "1px solid #E0E0E0"
+                                                }}
                                             >
-                                                {/* Top Row: number + priority + status button */}
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2 min-w-0">
-                                                        <span className="font-mono text-xs text-muted-foreground flex-shrink-0">
-                                                            #{num}
-                                                        </span>
-
-                                                        {/* Priority cycling button */}
-                                                        <button
-                                                            onClick={() => handleCyclePriority(comment)}
-                                                            title="Click to cycle priority: high → medium → low → none"
-                                                            className={`font-mono text-xs flex-shrink-0 border border-border px-1.5 py-0.5
-                                                                hover:border-foreground transition-colors
-                                                                ${priCfg ? priCfg.className : "text-muted-foreground hover:text-foreground"}`}
-                                                        >
-                                                            {priCfg ? priCfg.label : "[— PRI]"}
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Advance status button */}
-                                                    <button
-                                                        onClick={() => handleAdvanceStatus(comment)}
-                                                        title={isResolved ? "Reopen" : "Advance status"}
-                                                        className="font-mono text-xs text-muted-foreground hover:text-foreground
-                                                            flex-shrink-0 border border-border px-1.5 py-0.5
-                                                            hover:border-foreground transition-colors"
-                                                    >
-                                                        {isResolved ? "[↺]" : "[→]"}
-                                                    </button>
-                                                </div>
-
-                                                {/* Comment content */}
-                                                <p className="font-mono text-xs text-foreground leading-relaxed line-clamp-3">
+                                                {/* Task Name */}
+                                                <p className="font-mono text-[11px] leading-relaxed" style={{ color: "#050505" }}>
                                                     {comment.content}
                                                 </p>
 
-                                                {/* Footer */}
-                                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border">
-                                                    <span className="font-mono text-xs text-muted-foreground truncate">
-                                                        /{pageName}
+                                                {/* Footer: timestamp + badge */}
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="font-mono text-[9px]" style={{ color: "#A0A0A0" }}>
+                                                        {formatTime(comment.createdAt)}
                                                     </span>
-                                                    <span className="font-mono text-xs text-muted-foreground flex-shrink-0">
-                                                        {comment.author} · {date}
-                                                    </span>
+                                                    {priCfg && (
+                                                        <div
+                                                            className="px-2 py-0.5 font-mono text-[8px] font-semibold"
+                                                            style={{ backgroundColor: "#F5F5F5", color: "#050505" }}
+                                                        >
+                                                            {priCfg.label}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )
