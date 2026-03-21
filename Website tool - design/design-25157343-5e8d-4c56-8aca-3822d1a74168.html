@@ -1,0 +1,635 @@
+<html lang="en" vid="0"><head vid="1">
+    <meta charset="UTF-8" vid="2">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" vid="3">
+    <title vid="4">Feedback Tool</title>
+    <style vid="5">
+        :root {
+            --bg-color: #F4F4F4;
+            --text-color: #050505;
+            --accent-green: #88F156;
+            --border-color: #050505;
+            --border-light: #C0C0C0;
+            --font-sans: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+            --spacing-unit: 1rem;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-sans);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            font-size: 13px;
+        }
+
+        
+        .mono {
+            font-family: var(--font-mono);
+            letter-spacing: -0.02em;
+        }
+        
+        .label {
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            font-size: 10px;
+            color: var(--text-color);
+            opacity: 0.7;
+        }
+
+        .slash-label::before {
+            content: '/ ';
+            opacity: 0.5;
+        }
+
+        
+        .app-container {
+            display: grid;
+            grid-template-rows: 40px 1fr;
+            height: 100%;
+            width: 100%;
+        }
+
+        
+        .top-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 var(--spacing-unit);
+            border-bottom: 1px solid var(--border-color);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+        }
+
+        .nav-item {
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .nav-item:hover {
+            opacity: 1;
+        }
+
+        
+        .workspace {
+            display: grid;
+            grid-template-columns: 240px 1fr 380px; 
+            height: 100%;
+            overflow: hidden;
+        }
+
+        
+        .sidebar {
+            border-right: 1px solid var(--border-color);
+            padding: 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            overflow-y: auto;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .tree-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            cursor: pointer;
+            color: #444;
+            font-size: 13px;
+        }
+
+        .tree-item:hover {
+            color: #000;
+        }
+
+        .tree-icon {
+            width: 12px;
+            height: 12px;
+            border: 1px solid #999;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+        }
+
+        .tree-count {
+            margin-left: auto;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: #888;
+        }
+
+        .sidebar-footer {
+            margin-top: auto;
+        }
+
+        .status-widget {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            height: 120px;
+            position: relative;
+            background-image: radial-gradient(#000 1px, transparent 1px);
+            background-size: 10px 10px;
+            opacity: 0.5;
+        }
+        
+        .status-widget-header {
+            position: absolute;
+            top: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-color);
+            padding: 0 6px;
+            font-family: var(--font-mono);
+            font-size: 9px;
+        }
+
+        
+        .feed-area {
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            background: var(--bg-color);
+            overflow: hidden;
+        }
+
+        .feed-header {
+            padding: 24px 24px 16px 24px;
+            flex-shrink: 0;
+        }
+
+        .page-title {
+            font-size: 48px;
+            font-weight: 500;
+            letter-spacing: -0.04em;
+            line-height: 1;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .count-superscript {
+            font-size: 14px;
+            font-family: var(--font-mono);
+            font-weight: 400;
+            margin-top: 4px;
+            letter-spacing: 0;
+        }
+
+        .column-headers {
+            display: grid;
+            grid-template-columns: 80px 1.5fr 3fr 1fr 40px;
+            padding: 8px 24px;
+            border-bottom: 1px solid var(--border-color);
+            gap: 16px;
+        }
+
+        .feed-list {
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .list-row {
+            display: grid;
+            grid-template-columns: 80px 1.5fr 3fr 1fr 40px;
+            padding: 10px 24px;
+            border-bottom: 1px solid var(--border-light);
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .list-row:hover {
+            background-color: rgba(0,0,0,0.03);
+        }
+
+        .list-row.active {
+            background-color: var(--accent-green);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .list-row.active .list-cell, 
+        .list-row.active .mono {
+            color: black;
+            font-weight: 500;
+        }
+
+        .list-cell {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .bullet-date {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .square-bullet {
+            width: 5px;
+            height: 5px;
+            background-color: black;
+        }
+
+        .badge {
+            font-family: var(--font-mono);
+            font-size: 9px;
+            text-transform: uppercase;
+            border: 1px solid var(--border-color);
+            padding: 2px 6px;
+            display: inline-block;
+            text-align: center;
+        }
+
+        
+        .detail-panel {
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .detail-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .preview-window {
+            margin: 16px;
+            border: 1px solid var(--border-color);
+            height: 250px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .window-bar {
+            border-bottom: 1px solid var(--border-color);
+            padding: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .window-content {
+            flex: 1;
+            background-image: radial-gradient(#aaa 1px, transparent 1px);
+            background-size: 20px 20px;
+            background-position: center;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .screenshot-placeholder {
+            width: 80%;
+            height: 70%;
+            border: 1px dashed #999;
+            background: rgba(255,255,255,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: #666;
+        }
+
+        .detail-meta {
+            padding: 0 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .meta-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .meta-value {
+            font-size: 14px;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 4px;
+        }
+
+        .comment-section {
+            padding: 0 16px 24px 16px;
+        }
+        
+        .comment-body {
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 8px;
+            background: #fff;
+            border: 1px solid var(--border-light);
+            padding: 12px;
+        }
+        
+        .actions-bar {
+            margin-top: auto;
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.1s;
+        }
+        
+        .btn:hover {
+            background: #000;
+            color: #fff;
+        }
+        
+        .btn-primary {
+            background: var(--accent-green);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-primary:hover {
+            background: #76d44a;
+            color: #000;
+        }
+
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+    </style>
+</head>
+<body vid="6">
+
+    <div class="app-container" vid="7">
+        
+        <nav class="top-nav" vid="8">
+            <div class="nav-links" vid="9">
+                <div class="nav-item" vid="10">[D] DASHBOARD</div>
+                <div class="nav-item" style="opacity: 1; border-bottom: 1px solid black; padding-bottom: 12px; margin-bottom: -13px;" vid="11">[F] FEEDBACK</div>
+                <div class="nav-item" vid="12">[P] PROJECTS</div>
+            </div>
+            <div class="nav-links" vid="13">
+                <div class="nav-item" vid="14">[?] HELP</div>
+                <div class="nav-item" vid="15">[S] SETTINGS</div>
+            </div>
+        </nav>
+
+        <div class="workspace" vid="16">
+            
+            <aside class="sidebar" vid="17">
+                <div class="filter-group" vid="18">
+                    <div class="filter-header label slash-label" vid="19">FILTER</div>
+                    <div class="filter-header" style="justify-content: flex-end; font-size: 10px; font-family: var(--font-mono); cursor: pointer; text-decoration: underline;" vid="20">CLEAR FILTERS</div>
+                    
+                    
+                    <div style="margin-top: 8px;" vid="21">
+                        <div class="tree-item" vid="22">
+                            <span class="tree-icon" vid="23">-</span>
+                            <span vid="24">Status</span>
+                        </div>
+                        <div style="padding-left: 20px; display: flex; flex-direction: column;" vid="25">
+                            <div class="tree-item" vid="26">
+                                <div class="tree-icon" style="border-color: #ccc;" vid="27"> </div>
+                                <span style="color: #666;" vid="28">Unread</span>
+                                <span class="tree-count" vid="29">(12)</span>
+                            </div>
+                            <div class="tree-item" vid="30">
+                                <div class="tree-icon" style="background: black;" vid="31">✓</div>
+                                <span style="color: #000;" vid="32">Open</span>
+                                <span class="tree-count" vid="33">(24)</span>
+                            </div>
+                            <div class="tree-item" vid="34">
+                                <div class="tree-icon" style="border-color: #ccc;" vid="35"> </div>
+                                <span style="color: #666;" vid="36">In Progress</span>
+                                <span class="tree-count" vid="37">(8)</span>
+                            </div>
+                            <div class="tree-item" vid="38">
+                                <div class="tree-icon" style="border-color: #ccc;" vid="39"> </div>
+                                <span style="color: #666;" vid="40">Resolved</span>
+                                <span class="tree-count" vid="41">(102)</span>
+                            </div>
+                        </div>
+
+                        <div class="tree-item" style="margin-top: 16px;" vid="42">
+                            <span class="tree-icon" vid="43">+</span>
+                            <span vid="44">Pages</span>
+                        </div>
+                        <div class="tree-item" vid="45">
+                            <span class="tree-icon" vid="46">+</span>
+                            <span vid="47">Urgency</span>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div class="sidebar-footer" vid="48">
+                    <div class="status-widget" vid="49">
+                        <div class="status-widget-header" vid="50">[ SYSTEM_IDLE ]</div>
+                        <svg width="100%" height="100%" viewBox="0 0 200 100" preserveAspectRatio="none" vid="51">
+                            <path d="M0,100 C50,100 50,80 100,50 C150,20 150,80 200,80 L200,100 Z" fill="none" stroke="black" stroke-width="1" opacity="0.5" vid="52"></path>
+                            <line x1="0" y1="20" x2="200" y2="20" stroke="black" stroke-width="1" stroke-dasharray="2,4" opacity="0.2" vid="53"></line>
+                            <line x1="0" y1="50" x2="200" y2="50" stroke="black" stroke-width="1" stroke-dasharray="2,4" opacity="0.2" vid="54"></line>
+                            <line x1="0" y1="80" x2="200" y2="80" stroke="black" stroke-width="1" stroke-dasharray="2,4" opacity="0.2" vid="55"></line>
+                        </svg>
+                    </div>
+                </div>
+            </aside>
+
+            
+            <main class="feed-area" vid="56">
+                <header class="feed-header" vid="57">
+                    <h1 class="page-title" vid="58">
+                        Feedback <span class="count-superscript" vid="59">(24)</span>
+                    </h1>
+                </header>
+
+                <div class="column-headers label" vid="60">
+                    <div class="slash-label" vid="61">ID</div>
+                    <div class="slash-label" vid="62">PAGE</div>
+                    <div class="slash-label" vid="63">COMMENT PREVIEW</div>
+                    <div class="slash-label" vid="64">REPORTER</div>
+                    <div class="slash-label" vid="65">TYPE</div>
+                </div>
+
+                <div class="feed-list" vid="66">
+                    
+                    <div class="list-row" vid="67">
+                        <div class="mono bullet-date" vid="68"><span class="square-bullet" vid="69"></span>042</div>
+                        <div class="mono" vid="70">/pricing</div>
+                        <div class="list-cell" vid="71">Mobile view breaks on iPhone 14 Pro Max landscape mode</div>
+                        <div class="list-cell mono" style="font-size: 11px;" vid="72">j.doe@corp.com</div>
+                        <div class="badge" vid="73">BUG</div>
+                    </div>
+
+                    
+                    <div class="list-row" vid="74">
+                        <div class="mono bullet-date" vid="75"><span class="square-bullet" vid="76"></span>041</div>
+                        <div class="mono" vid="77">/home</div>
+                        <div class="list-cell" vid="78">Hero image takes too long to load on 4G networks</div>
+                        <div class="list-cell mono" style="font-size: 11px;" vid="79">guest_02</div>
+                        <div class="badge" vid="80">PERF</div>
+                    </div>
+
+                    
+                    <div class="list-row active" vid="81">
+                        <div class="mono bullet-date" vid="82"><span class="square-bullet" vid="83"></span>040</div>
+                        <div class="mono" vid="84">/about</div>
+                        <div class="list-cell" vid="85">Typo in the second paragraph: "recieved" should be "received"</div>
+                        <div class="list-cell mono" style="font-size: 11px;" vid="86">editor@sys.io</div>
+                        <div class="badge" style="border-color: black;" vid="87">CONTENT</div>
+                    </div>
+
+                    
+                    <div class="list-row" vid="88">
+                        <div class="mono bullet-date" vid="89"><span class="square-bullet" vid="90"></span>039</div>
+                        <div class="mono" vid="91">/contact</div>
+                        <div class="list-cell" vid="92">Submit button state remains disabled after validation</div>
+                        <div class="list-cell mono" style="font-size: 11px;" vid="93">qa_team</div>
+                        <div class="badge" vid="94">BUG</div>
+                    </div>
+
+                    
+                    <div class="list-row" vid="95">
+                        <div class="mono bullet-date" vid="96"><span class="square-bullet" vid="97"></span>038</div>
+                        <div class="mono" vid="98">/pricing</div>
+                        <div class="list-cell" vid="99">Currency toggle is confusing, add labels</div>
+                        <div class="list-cell mono" style="font-size: 11px;" vid="100">m.scott</div>
+                        <div class="badge" vid="101">UX</div>
+                    </div>
+                     
+                     <div class="list-row" vid="102">
+                        <div class="mono bullet-date" vid="103"><span class="square-bullet" vid="104"></span>037</div>
+                        <div class="mono" vid="105">/docs/api</div>
+                        <div class="list-cell" vid="106">API endpoint documentation missing for user/update</div>
+                        <div class="list-cell mono" style="font-size: 11px;" vid="107">dev_rel</div>
+                        <div class="badge" vid="108">DOCS</div>
+                    </div>
+                     
+                     <div class="list-row" vid="109">
+                        <div class="mono bullet-date" vid="110"><span class="square-bullet" vid="111"></span>036</div>
+                        <div class="mono" vid="112">/global</div>
+                        <div class="list-cell" vid="113">Footer links are not clickable in Safari</div>
+                        <div class="list-cell mono" style="font-size: 11px;" vid="114">browser_stack</div>
+                        <div class="badge" vid="115">BUG</div>
+                    </div>
+                </div>
+            </main>
+
+            
+            <aside class="detail-panel" vid="116">
+                <div class="detail-header" vid="117">
+                    <span class="label slash-label" vid="118">DETAILS</span>
+                    <span class="mono" style="font-size: 11px;" vid="119">[ESC] TO CLOSE</span>
+                </div>
+
+                <div class="preview-window" vid="120">
+                    <div class="window-bar label mono" style="font-size: 9px;" vid="121">
+                        [ VIEWPORT: 1440 x 900 ]
+                    </div>
+                    <div class="window-content" vid="122">
+                        
+                        <div class="screenshot-placeholder" vid="123">
+                            IMG_SNAPSHOT_040.PNG
+                        </div>
+                        <div style="position: absolute; top: 40%; left: 30%; width: 40px; height: 40px; border: 2px solid var(--accent-green); box-shadow: 0 0 0 1px black;" vid="124"></div>
+                    </div>
+                </div>
+
+                <div class="detail-meta" vid="125">
+                    <div class="meta-group" vid="126">
+                        <span class="label slash-label" vid="127">REPORTER</span>
+                        <span class="meta-value mono" vid="128">editor@sys.io</span>
+                    </div>
+                    <div class="meta-group" vid="129">
+                        <span class="label slash-label" vid="130">BROWSER</span>
+                        <span class="meta-value mono" vid="131">Chrome 118 (Mac)</span>
+                    </div>
+                </div>
+
+                <div class="detail-meta" vid="132">
+                    <div class="meta-group" vid="133">
+                        <span class="label slash-label" vid="134">TIMESTAMP</span>
+                        <span class="meta-value mono" vid="135">2023.10.27 14:32</span>
+                    </div>
+                    <div class="meta-group" vid="136">
+                        <span class="label slash-label" vid="137">PRIORITY</span>
+                        <span class="meta-value mono" vid="138">P3 - LOW</span>
+                    </div>
+                </div>
+
+                <div class="comment-section" vid="139">
+                    <span class="label slash-label" vid="140">FULL COMMENT</span>
+                    <div class="comment-body" vid="141">
+                        Typo in the second paragraph of the team section. The word "recieved" is spelled incorrectly. It should be "received".
+                        <br vid="142"><br vid="143">
+                        Please fix before the Tuesday deployment.
+                    </div>
+                </div>
+
+                <div class="actions-bar" vid="144">
+                    <button class="btn" vid="145">ARCHIVE</button>
+                    <button class="btn btn-primary" vid="146">MARK RESOLVED</button>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+
+</body></html>

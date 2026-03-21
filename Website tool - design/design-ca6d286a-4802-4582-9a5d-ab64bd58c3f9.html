@@ -1,0 +1,541 @@
+<html lang="en" vid="0"><head vid="1">
+    <meta charset="UTF-8" vid="2">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" vid="3">
+    <title vid="4">Feedback Triage Interface</title>
+    <style vid="5">
+        :root {
+            --bg-color: #F4F4F4;
+            --text-color: #050505;
+            --accent-color: #82F065; 
+            --border-color: #CCCCCC;
+            --border-dark: #000000;
+            --font-display: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            --font-mono: 'Space Mono', 'Courier New', monospace;
+            --spacing-unit: 1rem;
+            --sidebar-width: 280px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-display);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            font-size: 14px;
+        }
+
+        
+        .mono {
+            font-family: var(--font-mono);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .label {
+            color: #666;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        
+        .label::before {
+            content: '/ ';
+            color: #999;
+        }
+
+        
+        .top-nav {
+            height: 40px;
+            display: flex;
+            align-items: center;
+            padding: 0 2rem;
+            border-bottom: 1px solid transparent; 
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+        }
+
+        .nav-item {
+            margin-right: 2rem;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .nav-item:hover {
+            opacity: 1;
+        }
+
+        .nav-key {
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        .top-right {
+            margin-left: auto;
+        }
+
+        
+        .page-header {
+            padding: 1rem 2rem 2rem 2rem;
+            display: flex;
+            align-items: baseline;
+        }
+
+        h1 {
+            font-size: 6rem;
+            font-weight: 700;
+            letter-spacing: -0.04em;
+            line-height: 1;
+        }
+
+        .count {
+            font-size: 1.5rem;
+            vertical-align: super;
+            margin-left: 0.5rem;
+            font-weight: 500;
+        }
+
+        
+        .workspace {
+            display: flex;
+            flex: 1;
+            height: 100%;
+            border-top: 1px solid var(--border-dark);
+            margin: 0 2rem 2rem 2rem;
+            position: relative;
+        }
+
+        
+        .sidebar {
+            width: var(--sidebar-width);
+            padding-top: 1.5rem;
+            border-right: 1px solid transparent;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .filter-group {
+            padding-right: 2rem;
+        }
+
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .tree-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 0;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #888;
+            transition: color 0.2s;
+        }
+
+        .tree-item:hover, .tree-item.active {
+            color: var(--text-color);
+        }
+
+        .tree-item.active {
+            font-weight: 500;
+        }
+
+        .tree-icon {
+            margin-right: 8px;
+            font-size: 0.8rem;
+        }
+
+        .tree-children {
+            padding-left: 1.2rem;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid #ddd;
+            margin-left: 4px;
+        }
+
+        
+        .list-view {
+            flex: 1;
+            overflow-y: auto;
+            border-left: 1px solid var(--border-dark);
+        }
+
+        .list-header {
+            display: grid;
+            grid-template-columns: 100px 1fr 120px 40px;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-dark);
+            position: sticky;
+            top: 0;
+            background: var(--bg-color);
+            z-index: 10;
+        }
+
+        .list-row {
+            display: grid;
+            grid-template-columns: 100px 1fr 120px 40px;
+            padding: 0.85rem 1rem;
+            border-bottom: 1px solid #ddd;
+            cursor: pointer;
+            align-items: baseline;
+            transition: background-color 0.05s;
+            position: relative;
+        }
+
+        .list-row:hover {
+            background-color: #eee;
+        }
+
+        .list-row.selected {
+            background-color: var(--accent-color);
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .list-row.selected .col-title {
+            font-weight: 500;
+        }
+
+        .col-date {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            color: #555;
+        }
+
+        .list-row.selected .col-date {
+            color: #000;
+        }
+
+        .col-title {
+            font-size: 1.1rem;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-right: 1rem;
+        }
+
+        .col-tag {
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
+            text-align: right;
+            padding-right: 1rem;
+        }
+        
+        .col-action {
+            text-align: right;
+        }
+
+        .plus-icon {
+            font-weight: 300;
+            font-size: 1.2rem;
+            line-height: 1rem;
+        }
+
+        
+        .bullet {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: currentColor;
+            margin-right: 8px;
+        }
+
+        
+        .preview-window {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 260px;
+            height: 200px;
+            border: 1px solid var(--border-dark);
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            z-index: 50;
+        }
+
+        .win-header {
+            border-bottom: 1px solid var(--border-dark);
+            padding: 4px 8px;
+            display: flex;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.6rem;
+            background: #fff;
+        }
+
+        .win-body {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .list-row {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        
+        .list-row:nth-child(1) { animation-delay: 0.05s; }
+        .list-row:nth-child(2) { animation-delay: 0.1s; }
+        .list-row:nth-child(3) { animation-delay: 0.15s; }
+        .list-row:nth-child(4) { animation-delay: 0.2s; }
+        .list-row:nth-child(5) { animation-delay: 0.25s; }
+        .list-row:nth-child(6) { animation-delay: 0.3s; }
+        .list-row:nth-child(7) { animation-delay: 0.35s; }
+        .list-row:nth-child(8) { animation-delay: 0.4s; }
+        .list-row:nth-child(9) { animation-delay: 0.45s; }
+        .list-row:nth-child(10) { animation-delay: 0.5s; }
+
+    </style>
+</head>
+<body vid="6">
+
+    
+    <nav class="top-nav" vid="7">
+        <div class="nav-item" vid="8"><span class="nav-key" vid="9">[I]</span> ISSUES</div>
+        <div class="nav-item" vid="10"><span class="nav-key" vid="11">[R]</span> REPORTS</div>
+        <div class="nav-item" vid="12"><span class="nav-key" vid="13">[A]</span> ANALYTICS</div>
+        <div class="nav-item" vid="14"><span class="nav-key" vid="15">[S]</span> SETTINGS</div>
+        <div class="nav-item top-right" vid="16"><span class="nav-key" vid="17">[C]</span> CONSOLE</div>
+    </nav>
+
+    
+    <header class="page-header" vid="18">
+        <h1 vid="19">Audit</h1>
+        <span class="count" vid="20">(18)</span>
+    </header>
+
+    
+    <div class="workspace" vid="21">
+        
+        
+        <aside class="sidebar" vid="22">
+            
+            <div class="filter-group" vid="23">
+                <div class="filter-header mono" vid="24">
+                    <span class="label" vid="25">/ FILTER</span>
+                    <span style="cursor: pointer; text-decoration: underline;" vid="26">CLEAR</span>
+                </div>
+                
+                <div class="tree-item active" vid="27">
+                    <span class="tree-icon" vid="28">📂</span> Type
+                </div>
+                <div class="tree-children" vid="29">
+                    <div class="tree-item" vid="30"><span class="tree-icon" vid="31">▫</span> Bugs (12)</div>
+                    <div class="tree-item" vid="32"><span class="tree-icon" vid="33">▫</span> UX Polish (4)</div>
+                    <div class="tree-item" vid="34"><span class="tree-icon" vid="35">▫</span> Content (2)</div>
+                </div>
+                
+                <div style="height: 1rem;" vid="36"></div>
+
+                <div class="tree-item" vid="37">
+                    <span class="tree-icon" vid="38">📂</span> Priority
+                </div>
+                <div class="tree-children" vid="39">
+                    <div class="tree-item" vid="40"><span class="tree-icon" vid="41">▫</span> Critical (3)</div>
+                    <div class="tree-item" vid="42"><span class="tree-icon" vid="43">▫</span> High (5)</div>
+                    <div class="tree-item" vid="44"><span class="tree-icon" vid="45">▫</span> Low (10)</div>
+                </div>
+            </div>
+
+            
+            <div class="preview-window" vid="46">
+                <div class="win-header" vid="47">
+                    <span vid="48">[ VIEWPORT_01 ]</span>
+                    <span vid="49">100%</span>
+                </div>
+                <div class="win-body" vid="50">
+                    <canvas id="meshCanvas" vid="51"></canvas>
+                </div>
+            </div>
+        </aside>
+
+        
+        <section class="list-view" vid="52">
+            
+            <div class="list-header mono" vid="53">
+                <div class="label" vid="54">/ DATE</div>
+                <div class="label" vid="55">/ TICKET NAME</div>
+                <div class="label" style="text-align: right; padding-right: 1rem;" vid="56">/ PAGE</div>
+                <div vid="57"></div>
+            </div>
+
+            
+            <div class="list-row" vid="58">
+                <div class="col-date" vid="59"><span class="bullet" vid="60"></span>2023.11.14</div>
+                <div class="col-title" vid="61">Navigation z-index collision on scroll</div>
+                <div class="col-tag" vid="62">GLOBAL</div>
+                <div class="col-action plus-icon" vid="63">+</div>
+            </div>
+
+            <div class="list-row" vid="64">
+                <div class="col-date" vid="65"><span class="bullet" vid="66"></span>2023.11.12</div>
+                <div class="col-title" vid="67">Button hover states inconsistent in Dark Mode</div>
+                <div class="col-tag" vid="68">UI KIT</div>
+                <div class="col-action plus-icon" vid="69">+</div>
+            </div>
+
+            <div class="list-row" vid="70">
+                <div class="col-date" vid="71"><span class="bullet" vid="72"></span>2023.11.10</div>
+                <div class="col-title" vid="73">Typo in "Authentication" header</div>
+                <div class="col-tag" vid="74">LOGIN</div>
+                <div class="col-action plus-icon" vid="75">+</div>
+            </div>
+
+            <div class="list-row" vid="76">
+                <div class="col-date" vid="77"><span class="bullet" vid="78"></span>2023.11.08</div>
+                <div class="col-title" vid="79">Hero image not lazy loading on mobile</div>
+                <div class="col-tag" vid="80">HOME</div>
+                <div class="col-action plus-icon" vid="81">+</div>
+            </div>
+
+            
+            <div class="list-row selected" vid="82">
+                <div class="col-date" vid="83"><span class="bullet" vid="84"></span>2023.11.05</div>
+                <div class="col-title" vid="85">Pricing toggle overflowing container width</div>
+                <div class="col-tag" vid="86">PRICING</div>
+                <div class="col-action plus-icon" vid="87">+</div>
+            </div>
+
+            <div class="list-row" vid="88">
+                <div class="col-date" vid="89"><span class="bullet" vid="90"></span>2023.11.05</div>
+                <div class="col-title" vid="91">Footer links missing accessibility labels</div>
+                <div class="col-tag" vid="92">FOOTER</div>
+                <div class="col-action plus-icon" vid="93">+</div>
+            </div>
+
+            <div class="list-row" vid="94">
+                <div class="col-date" vid="95"><span class="bullet" vid="96"></span>2023.11.03</div>
+                <div class="col-title" vid="97">API Documentation 404 on redirect</div>
+                <div class="col-tag" vid="98">DOCS</div>
+                <div class="col-action plus-icon" vid="99">+</div>
+            </div>
+
+            <div class="list-row" vid="100">
+                <div class="col-date" vid="101"><span class="bullet" vid="102"></span>2023.11.02</div>
+                <div class="col-title" vid="103">Input fields missing focus ring</div>
+                <div class="col-tag" vid="104">FORMS</div>
+                <div class="col-action plus-icon" vid="105">+</div>
+            </div>
+
+            <div class="list-row" vid="106">
+                <div class="col-date" vid="107"><span class="bullet" vid="108"></span>2023.10.28</div>
+                <div class="col-title" vid="109">Modal close button hit-area too small</div>
+                <div class="col-tag" vid="110">UI KIT</div>
+                <div class="col-action plus-icon" vid="111">+</div>
+            </div>
+
+            <div class="list-row" vid="112">
+                <div class="col-date" vid="113"><span class="bullet" vid="114"></span>2023.10.25</div>
+                <div class="col-title" vid="115">Stripe integration failing sandbox validation</div>
+                <div class="col-tag" vid="116">BILLING</div>
+                <div class="col-action plus-icon" vid="117">+</div>
+            </div>
+             <div class="list-row" vid="118">
+                <div class="col-date" vid="119"><span class="bullet" vid="120"></span>2023.10.21</div>
+                <div class="col-title" vid="121">User avatar blurry on Retina displays</div>
+                <div class="col-tag" vid="122">PROFILE</div>
+                <div class="col-action plus-icon" vid="123">+</div>
+            </div>
+        </section>
+    </div>
+
+    
+    <script vid="124">
+        const canvas = document.getElementById('meshCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        
+        function resize() {
+            canvas.width = canvas.parentElement.offsetWidth;
+            canvas.height = canvas.parentElement.offsetHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let time = 0;
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 0.5;
+
+            const cols = 10;
+            const rows = 8;
+            const cellW = canvas.width / cols;
+            const cellH = canvas.height / rows;
+
+            for (let i = 0; i <= cols; i++) {
+                for (let j = 0; j <= rows; j++) {
+                    
+                    const xBase = i * cellW;
+                    const yBase = j * cellH;
+                    
+                    const dist = Math.sqrt(Math.pow(xBase - canvas.width/2, 2) + Math.pow(yBase - canvas.height/2, 2));
+                    const wave = Math.sin(dist * 0.05 - time) * 10;
+                    
+                    
+                    if (i < cols) {
+                        ctx.beginPath();
+                        ctx.moveTo(xBase, yBase + wave);
+                        
+                        const nextX = (i + 1) * cellW;
+                        const nextDist = Math.sqrt(Math.pow(nextX - canvas.width/2, 2) + Math.pow(yBase - canvas.height/2, 2));
+                        const nextWave = Math.sin(nextDist * 0.05 - time) * 10;
+                        
+                        ctx.lineTo(nextX, yBase + nextWave);
+                        ctx.stroke();
+                    }
+
+                    
+                    if (j < rows) {
+                        ctx.beginPath();
+                        ctx.moveTo(xBase, yBase + wave);
+                        
+                        const nextY = (j + 1) * cellH;
+                        const nextDist = Math.sqrt(Math.pow(xBase - canvas.width/2, 2) + Math.pow(nextY - canvas.height/2, 2));
+                        const nextWave = Math.sin(nextDist * 0.05 - time) * 10;
+                        
+                        ctx.lineTo(xBase, nextY + nextWave);
+                        ctx.stroke();
+                    }
+                }
+            }
+            
+            
+            ctx.fillStyle = 'rgba(130, 240, 101, 0.1)';
+            const scanY = (time * 20) % canvas.height;
+            ctx.fillRect(0, scanY, canvas.width, 2);
+
+            time += 0.05;
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+    </script>
+
+</body></html>

@@ -1,0 +1,226 @@
+<html lang="en" vid="0"><head vid="1">
+<meta charset="UTF-8" vid="2">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" vid="3">
+<title vid="4">CLI Project Console</title>
+<style vid="5">
+    :root {
+        --bg: #050505;
+        --surface: #0A0A0A;
+        --text-main: #FFFFFF;
+        --text-secondary: #888888;
+        --text-meta: #555555;
+        --accent: #88FF66; 
+        --border-light: #1A1A1A;
+        --border-dark: #FFFFFF;
+        --font-mono: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+    }
+
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    body {
+        background-color: var(--bg);
+        color: var(--text-main);
+        font-family: var(--font-mono);
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .command-palette {
+        width: 800px;
+        background: var(--surface);
+        border: 1px solid var(--border-light);
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .palette-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border-light);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .prompt-icon {
+        color: var(--accent);
+    }
+
+    .search-input {
+        background: transparent;
+        border: none;
+        color: var(--text-main);
+        font-family: var(--font-mono);
+        font-size: 14px;
+        outline: none;
+        flex: 1;
+    }
+
+    .status-bar {
+        padding: 8px 20px;
+        background: #0f0f0f;
+        border-bottom: 1px solid var(--border-light);
+        font-size: 11px;
+        color: var(--text-meta);
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .project-list {
+        max-height: 500px;
+        overflow-y: auto;
+    }
+
+    .project-row {
+        display: grid;
+        grid-template-columns: 240px 180px 80px 100px 1fr;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-light);
+        align-items: center;
+        text-decoration: none;
+        color: inherit;
+        font-size: 12px;
+        transition: background 0.1s;
+    }
+
+    .project-row:hover {
+        background: #151515;
+    }
+
+    .project-row:hover .project-name {
+        color: var(--accent);
+    }
+
+    .project-name {
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ascii-progress {
+        color: var(--text-meta);
+        letter-spacing: -1px;
+    }
+
+    .progress-fill {
+        color: var(--accent);
+    }
+
+    .stat-label {
+        color: var(--text-secondary);
+        font-size: 10px;
+        margin-right: 4px;
+    }
+
+    .meta-text {
+        color: var(--text-meta);
+        text-align: right;
+    }
+
+    .palette-footer {
+        padding: 12px 20px;
+        border-top: 1px solid var(--border-light);
+        display: flex;
+        gap: 16px;
+        font-size: 10px;
+        color: var(--text-meta);
+    }
+
+    .key-hint {
+        color: var(--text-secondary);
+    }
+
+    .key-hint span {
+        background: #1A1A1A;
+        padding: 2px 4px;
+        border-radius: 2px;
+        color: var(--text-main);
+        margin-right: 4px;
+    }
+
+    .cursor {
+        display: inline-block;
+        width: 8px;
+        height: 15px;
+        background: var(--accent);
+        vertical-align: middle;
+        animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+        50% { opacity: 0; }
+    }
+
+</style>
+</head>
+<body vid="6">
+
+    <div class="command-palette" vid="7">
+        <div class="palette-header" vid="8">
+            <span class="prompt-icon" vid="9">&gt;</span>
+            <div class="search-input" vid="10">workspace/active_projects<span class="cursor" vid="11"></span></div>
+            <div class="meta-text" style="font-size: 10px;" vid="12">4 TOTAL</div>
+        </div>
+
+        <div class="status-bar" vid="13">
+            <div vid="14">NAME</div>
+            <div style="margin-left: -20px;" vid="15">BUILD_STATUS</div>
+            <div vid="16">ISSUES</div>
+            <div vid="17">OWNER</div>
+            <div vid="18" style="text-align: right;">LAST_ACTIVE</div>
+        </div>
+
+        <div class="project-list" vid="19">
+            
+            <a href="#" class="project-row" vid="20">
+                <span class="project-name" vid="21">stripe-redesign</span>
+                <span class="ascii-progress" vid="22">[<span class="progress-fill" vid="23">#########---</span>] 85%</span>
+                <span vid="24"><span class="stat-label" vid="25">I:</span>12</span>
+                <span vid="26">JD, AM, TR</span>
+                <span class="meta-text" vid="27">2m ago</span>
+            </a>
+
+            <a href="#" class="project-row" vid="28">
+                <span class="project-name" vid="29">acme-mobile-app</span>
+                <span class="ascii-progress" vid="30">[<span class="progress-fill" vid="31">###---------</span>] 32%</span>
+                <span vid="32"><span class="stat-label" vid="33">I:</span>48</span>
+                <span vid="34">BP, JD, LH</span>
+                <span class="meta-text" vid="35">1h ago</span>
+            </a>
+
+            <a href="#" class="project-row" vid="36">
+                <span class="project-name" vid="37">linear-landing</span>
+                <span class="ascii-progress" vid="38">[<span class="progress-fill" vid="39">#######-----</span>] 60%</span>
+                <span vid="40"><span class="stat-label" vid="41">I:</span>08</span>
+                <span vid="42">MK, AM, BP</span>
+                <span class="meta-text" vid="43">Yesterday</span>
+            </a>
+
+            <a href="#" class="project-row" vid="44">
+                <span class="project-name" vid="45">feedback-v2.0</span>
+                <span class="ascii-progress" vid="46">[<span class="progress-fill" vid="47">------------</span>] 0%</span>
+                <span vid="48"><span class="stat-label" vid="49">I:</span>00</span>
+                <span vid="50">SK, MK</span>
+                <span class="meta-text" vid="51">3d ago</span>
+            </a>
+
+        </div>
+
+        <div class="palette-footer" vid="52">
+            <div class="key-hint" vid="53"><span vid="54">↑↓</span> Navigate</div>
+            <div class="key-hint" vid="55"><span vid="56">↵</span> Select</div>
+            <div class="key-hint" vid="57"><span vid="58">⌘N</span> New Project</div>
+            <div class="key-hint" vid="59" style="margin-left: auto;"><span vid="60">ESC</span> Close</div>
+        </div>
+    </div>
+
+</body></html>

@@ -1,0 +1,570 @@
+<html lang="en" vid="0"><head vid="1">
+    <meta charset="UTF-8" vid="2">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" vid="3">
+    <title vid="4">Feedback Console</title>
+    <style vid="5">
+        :root {
+            --bg-color: #F4F4F4;
+            --text-color: #050505;
+            --line-color: #D1D1D1;
+            --accent-color: #8CFF68; 
+            --meta-color: #666666;
+            
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --font-mono: 'Space Mono', 'Courier New', monospace;
+            
+            --space-xs: 4px;
+            --space-s: 12px;
+            --space-m: 24px;
+            --space-l: 48px;
+            --space-xl: 96px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-main);
+            -webkit-font-smoothing: antialiased;
+            height: 100vh;
+            overflow: hidden;
+            font-size: 13px;
+        }
+
+        
+        .slash-header {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--meta-color);
+            letter-spacing: 0.05em;
+            margin-bottom: var(--space-s);
+        }
+        
+        .slash-header::before {
+            content: '/ ';
+            opacity: 0.5;
+        }
+
+        
+        .app-container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            max-width: 1600px;
+            margin: 0 auto;
+            border-left: 1px solid var(--line-color);
+            border-right: 1px solid var(--line-color);
+        }
+
+        
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: var(--space-m) var(--space-m) 0 var(--space-m);
+        }
+
+        .nav-shortcuts {
+            display: flex;
+            gap: var(--space-m);
+        }
+
+        .nav-item {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            cursor: pointer;
+            color: var(--meta-color);
+            transition: color 0.2s;
+        }
+
+        .nav-item:hover {
+            color: var(--text-color);
+        }
+
+        .brand-title {
+            font-size: 8rem;
+            font-weight: 500;
+            letter-spacing: -0.07em;
+            line-height: 0.8;
+            margin-top: var(--space-l);
+            margin-bottom: var(--space-l);
+            margin-left: -6px; 
+            position: relative;
+        }
+
+        .counter-sup {
+            font-size: 1.5rem;
+            letter-spacing: -0.02em;
+            vertical-align: super;
+            margin-left: var(--space-s);
+            font-family: var(--font-mono);
+            color: var(--text-color);
+        }
+
+        
+        .content-area {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        
+        .sidebar {
+            padding: 0 var(--space-m) var(--space-m) var(--space-m);
+            display: flex;
+            flex-direction: column;
+            gap: var(--space-l);
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--meta-color);
+            cursor: pointer;
+            padding: 2px 0;
+        }
+
+        .filter-item:hover {
+            color: var(--text-color);
+        }
+
+        .filter-item.active {
+            color: var(--text-color);
+        }
+        
+        .filter-checkbox {
+            width: 10px;
+            height: 10px;
+            border: 1px solid #ccc;
+            border-radius: 2px;
+            display: grid;
+            place-items: center;
+        }
+
+        .filter-item.active .filter-checkbox {
+            background: var(--text-color);
+            border-color: var(--text-color);
+        }
+
+        
+        
+        .wireframe-widget {
+            margin-top: auto;
+            border: 1px solid var(--text-color);
+            height: 200px;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+            background: #fff;
+        }
+        
+        .wireframe-header {
+            border-bottom: 1px solid var(--text-color);
+            padding: 4px 8px;
+            font-family: var(--font-mono);
+            font-size: 9px;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .wireframe-content {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        
+        .grid-mesh {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+            transform: perspective(300px) rotateX(20deg) scale(1.5);
+            transform-origin: bottom center;
+        }
+
+        .heatmap-blob {
+            position: absolute;
+            width: 120px;
+            height: 120px;
+            background: radial-gradient(circle, rgba(0,0,0,0.8) 0%, transparent 70%);
+            top: 40%;
+            left: 30%;
+            border-radius: 50%;
+            mix-blend-mode: multiply;
+            opacity: 0.1;
+        }
+
+        
+        .feed-container {
+            border-left: 1px solid var(--text-color); 
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .list-header-row {
+            display: grid;
+            grid-template-columns: 120px 1fr 100px 40px;
+            padding: 0 var(--space-m) var(--space-s) var(--space-m);
+            position: sticky;
+            top: 0;
+            background: var(--bg-color);
+            z-index: 10;
+        }
+
+        .list-item {
+            display: grid;
+            grid-template-columns: 120px 1fr 100px 40px;
+            padding: 14px var(--space-m);
+            border-top: 1px solid var(--line-color);
+            align-items: baseline;
+            cursor: pointer;
+            transition: background-color 0.1s;
+            position: relative;
+        }
+
+        .list-item:hover {
+            background-color: rgba(0,0,0,0.02);
+        }
+
+        
+        .list-item.selected {
+            background-color: var(--accent-color);
+            border-top: 1px solid transparent;
+            border-bottom: 1px solid transparent;
+        }
+
+        .list-item.selected + .list-item {
+            border-top: 1px solid transparent;
+        }
+
+        .col-date {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .square-bullet {
+            width: 6px;
+            height: 6px;
+            background-color: var(--text-color);
+            display: inline-block;
+        }
+
+        .col-title {
+            font-size: 15px;
+            font-weight: 400;
+            letter-spacing: -0.01em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding-right: 20px;
+        }
+
+        .col-tag {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            text-transform: uppercase;
+            justify-self: end;
+            opacity: 0.7;
+        }
+        
+        .list-item.selected .col-tag {
+            opacity: 1;
+            font-weight: 600;
+        }
+
+        .col-action {
+            justify-self: end;
+            font-family: var(--font-mono);
+            font-size: 14px;
+            color: var(--meta-color);
+        }
+        
+        .list-item.selected .col-action {
+            color: var(--text-color);
+        }
+
+        
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #ccc;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
+        }
+
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&amp;family=Space+Mono:wght@400;700&amp;display=swap" rel="stylesheet" vid="6">
+</head>
+<body vid="7">
+
+    <div class="app-container" vid="8">
+        
+        
+        <header vid="9">
+            <div class="top-nav" vid="10">
+                <div class="nav-shortcuts" vid="11">
+                    <div class="nav-item" vid="12">[P] PROJECTS</div>
+                    <div class="nav-item" vid="13">[T] TICKETS</div>
+                    <div class="nav-item" vid="14">[R] REPORTS</div>
+                    <div class="nav-item" vid="15">[S] SETTINGS</div>
+                </div>
+                <div class="nav-item" vid="16">[C] CONSOLE</div>
+            </div>
+
+            <div style="padding: 0 var(--space-m);" vid="17">
+                <h1 class="brand-title" vid="18">Review<span class="counter-sup" vid="19">(128)</span></h1>
+            </div>
+        </header>
+
+        
+        <div class="content-area" vid="20">
+            
+            
+            <aside class="sidebar" vid="21">
+                
+                <div style="flex-grow: 1;" vid="22">
+                    <div class="slash-header" vid="23">/ STATUS</div>
+                    <div class="filter-group" vid="24">
+                        <div class="filter-item active" vid="25">
+                            <div class="filter-checkbox" vid="26"></div>
+                            <span vid="27">Unresolved (86)</span>
+                        </div>
+                        <div class="filter-item" vid="28">
+                            <div class="filter-checkbox" vid="29"></div>
+                            <span vid="30">In Progress (32)</span>
+                        </div>
+                        <div class="filter-item" vid="31">
+                            <div class="filter-checkbox" vid="32"></div>
+                            <span vid="33">Archived (10)</span>
+                        </div>
+                    </div>
+
+                    <div class="slash-header" style="margin-top: 32px;" vid="34">/ PRIORITY</div>
+                    <div class="filter-group" vid="35">
+                        <div class="filter-item" vid="36">
+                            <div class="filter-checkbox" vid="37"></div>
+                            <span vid="38">Critical</span>
+                        </div>
+                        <div class="filter-item" vid="39">
+                            <div class="filter-checkbox" vid="40"></div>
+                            <span vid="41">High</span>
+                        </div>
+                        <div class="filter-item" vid="42">
+                            <div class="filter-checkbox" vid="43"></div>
+                            <span vid="44">Low</span>
+                        </div>
+                    </div>
+                    
+                    <div class="slash-header" style="margin-top: 32px;" vid="45">/ ASSIGNEE</div>
+                    <div class="filter-group" vid="46">
+                        <div class="filter-item" vid="47">
+                            <div class="filter-checkbox" vid="48"></div>
+                            <span vid="49">@design_team</span>
+                        </div>
+                        <div class="filter-item" vid="50">
+                            <div class="filter-checkbox" vid="51"></div>
+                            <span vid="52">@dev_ops</span>
+                        </div>
+                    </div>
+                </div>
+
+                
+                <div class="wireframe-widget" vid="53">
+                    <div class="wireframe-header" vid="54">
+                        <span vid="55">[ SITE_MAP_V2 ]</span>
+                        <span vid="56">...</span>
+                    </div>
+                    <div class="wireframe-content" vid="57">
+                        <div class="grid-mesh" vid="58"></div>
+                        <div class="heatmap-blob" vid="59"></div>
+                    </div>
+                </div>
+
+            </aside>
+
+            
+            <main class="feed-container" vid="60">
+                <div class="list-header-row" vid="61">
+                    <div class="slash-header" vid="62">/ TIMESTAMP</div>
+                    <div class="slash-header" vid="63">/ ISSUE SUMMARY</div>
+                    <div class="slash-header" style="text-align: right;" vid="64">/ TAG</div>
+                    <div class="slash-header" style="text-align: right;" vid="65"></div>
+                </div>
+
+                
+                <div class="list-item" vid="66">
+                    <div class="col-date" vid="67">
+                        <span class="square-bullet" vid="68"></span>
+                        2023.11.14
+                    </div>
+                    <div class="col-title" vid="69">Navigation breaks on mobile viewport</div>
+                    <div class="col-tag" vid="70">BUG</div>
+                    <div class="col-action" vid="71">+</div>
+                </div>
+
+                
+                <div class="list-item" vid="72">
+                    <div class="col-date" vid="73">
+                        <span class="square-bullet" vid="74"></span>
+                        2023.11.14
+                    </div>
+                    <div class="col-title" vid="75">Update pricing modal copy for Q4</div>
+                    <div class="col-tag" vid="76">COPY</div>
+                    <div class="col-action" vid="77">+</div>
+                </div>
+
+                
+                <div class="list-item" vid="78">
+                    <div class="col-date" vid="79">
+                        <span class="square-bullet" vid="80"></span>
+                        2023.11.13
+                    </div>
+                    <div class="col-title" vid="81">Hero image fails to load on Safari 15</div>
+                    <div class="col-tag" vid="82">BUG</div>
+                    <div class="col-action" vid="83">+</div>
+                </div>
+
+                
+                <div class="list-item" vid="84">
+                    <div class="col-date" vid="85">
+                        <span class="square-bullet" vid="86"></span>
+                        2023.11.12
+                    </div>
+                    <div class="col-title" vid="87">Request to add "Dark Mode" toggle</div>
+                    <div class="col-tag" vid="88">FEATURE</div>
+                    <div class="col-action" vid="89">+</div>
+                </div>
+
+                
+                <div class="list-item selected" vid="90">
+                    <div class="col-date" vid="91">
+                        <span class="square-bullet" vid="92"></span>
+                        2023.11.12
+                    </div>
+                    <div class="col-title" vid="93">Login button misalignment on checkout</div>
+                    <div class="col-tag" vid="94">UX UI</div>
+                    <div class="col-action" vid="95">+</div>
+                </div>
+
+                
+                <div class="list-item" vid="96">
+                    <div class="col-date" vid="97">
+                        <span class="square-bullet" vid="98"></span>
+                        2023.11.10
+                    </div>
+                    <div class="col-title" vid="99">Footer links redirect to 404 page</div>
+                    <div class="col-tag" vid="100">CRITICAL</div>
+                    <div class="col-action" vid="101">+</div>
+                </div>
+
+                 
+                 <div class="list-item" vid="102">
+                    <div class="col-date" vid="103">
+                        <span class="square-bullet" vid="104"></span>
+                        2023.11.09
+                    </div>
+                    <div class="col-title" vid="105">Implement new font stack across dashboard</div>
+                    <div class="col-tag" vid="106">DESIGN</div>
+                    <div class="col-action" vid="107">+</div>
+                </div>
+
+                 
+                 <div class="list-item" vid="108">
+                    <div class="col-date" vid="109">
+                        <span class="square-bullet" vid="110"></span>
+                        2023.11.08
+                    </div>
+                    <div class="col-title" vid="111">API latency spikes during export</div>
+                    <div class="col-tag" vid="112">BACKEND</div>
+                    <div class="col-action" vid="113">+</div>
+                </div>
+
+                
+                <div class="list-item" vid="114">
+                    <div class="col-date" vid="115">
+                        <span class="square-bullet" vid="116"></span>
+                        2023.11.08
+                    </div>
+                    <div class="col-title" vid="117">User avatar not caching correctly</div>
+                    <div class="col-tag" vid="118">BUG</div>
+                    <div class="col-action" vid="119">+</div>
+                </div>
+
+                
+                <div class="list-item" vid="120">
+                    <div class="col-date" vid="121">
+                        <span class="square-bullet" vid="122"></span>
+                        2023.11.07
+                    </div>
+                    <div class="col-title" vid="123">Contrast ratio warning on primary buttons</div>
+                    <div class="col-tag" vid="124">ACCESSIBILITY</div>
+                    <div class="col-action" vid="125">+</div>
+                </div>
+
+                 
+                 <div class="list-item" vid="126">
+                    <div class="col-date" vid="127">
+                        <span class="square-bullet" vid="128"></span>
+                        2023.11.06
+                    </div>
+                    <div class="col-title" vid="129">Mobile menu overlap on landscape mode</div>
+                    <div class="col-tag" vid="130">RESPONSIVE</div>
+                    <div class="col-action" vid="131">+</div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script vid="132">
+        
+        const items = document.querySelectorAll('.list-item');
+        items.forEach(item => {
+            item.addEventListener('click', () => {
+                items.forEach(i => i.classList.remove('selected'));
+                item.classList.add('selected');
+            });
+        });
+
+        
+        const widget = document.querySelector('.wireframe-widget');
+        const mesh = document.querySelector('.grid-mesh');
+        
+        widget.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            mesh.style.transform = `perspective(300px) rotateX(20deg) scale(1.5) translate(${x * 10}px, ${y * 10}px)`;
+        });
+    </script>
+
+</body></html>

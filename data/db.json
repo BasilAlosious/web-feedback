@@ -4,7 +4,7 @@
       "id": "h2we8",
       "name": "Basil",
       "url": "http://basenine.co",
-      "markupCount": 1,
+      "markupCount": 2,
       "updatedAt": "Just now"
     },
     {
@@ -16,6 +16,15 @@
     }
   ],
   "markups": [
+    {
+      "id": "hdvs9e",
+      "projectId": "h2we8",
+      "name": "Case Study - Shikenso",
+      "url": "https://www.basenine.co/case-study/shikenso",
+      "viewport": "desktop",
+      "commentCount": 1,
+      "type": "website"
+    },
     {
       "id": "p2npx",
       "projectId": "h2we8",
@@ -79,7 +88,8 @@
       "y": 43.792325056433405,
       "content": "Needs improvement",
       "author": "Agency User",
-      "createdAt": "2026-02-24T12:19:50.032Z"
+      "createdAt": "2026-02-24T12:19:50.032Z",
+      "status": "resolved"
     },
     {
       "id": "7y6fsm",
@@ -88,7 +98,19 @@
       "y": 66.59142212189616,
       "content": "Change these images",
       "author": "Agency User",
-      "createdAt": "2026-02-24T12:20:01.032Z"
+      "createdAt": "2026-02-24T12:20:01.032Z",
+      "status": "in_progress"
+    },
+    {
+      "id": "wo20q",
+      "markupId": "hdvs9e",
+      "x": 6.287878787878788,
+      "y": 58.74704491725768,
+      "content": "change the color here",
+      "author": "Agency User",
+      "createdAt": "2026-03-14T09:32:45.917Z",
+      "status": "open",
+      "priority": "low"
     }
   ]
 }
