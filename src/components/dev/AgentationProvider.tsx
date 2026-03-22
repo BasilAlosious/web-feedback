@@ -9,15 +9,19 @@ interface AgentationProviderProps {
 
 export function AgentationProvider({ children }: AgentationProviderProps) {
     const [isEnabled, setIsEnabled] = useState(false)
-    const [isDevelopment, setIsDevelopment] = useState(false)
+    const [mounted, setMounted] = useState(false)
+
+    // Check development mode - this is inlined at build time by Next.js
+    const isDevelopment = process.env.NODE_ENV === 'development'
 
     useEffect(() => {
-        // Check if we're in development mode
-        setIsDevelopment(process.env.NODE_ENV === 'development')
+        setMounted(true)
+        if (!isDevelopment) return
 
         // Keyboard shortcut to toggle: Ctrl+Shift+A (or Cmd+Shift+A on Mac)
         const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+            // Check for Cmd/Ctrl + Shift + A (case insensitive)
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
                 e.preventDefault()
                 setIsEnabled(prev => !prev)
             }
@@ -25,7 +29,7 @@ export function AgentationProvider({ children }: AgentationProviderProps) {
 
         window.addEventListener('keydown', handleKeyDown)
         return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [])
+    }, [isDevelopment])
 
     const handleAnnotationAdd = (annotation: Annotation) => {
         console.log('[Agentation] Annotation added:', annotation)
@@ -69,22 +73,19 @@ export function AgentationProvider({ children }: AgentationProviderProps) {
                 />
             )}
 
-            {/* Status Indicator */}
-            {isEnabled && (
-                <div className="fixed bottom-4 right-4 z-[9999]">
-                    <div className="status-widget w-48 h-16">
-                        <div className="status-widget-header">[ AGENTATION ]</div>
-                        <div className="px-3 py-2">
-                            <span className="font-mono text-xs text-muted-foreground">
-                                <span className="text-accent">ACTIVE</span> • Press{" "}
-                                <span className="text-foreground">
-                                    {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Shift+A
-                                </span>{" "}
-                                to toggle
-                            </span>
-                        </div>
-                    </div>
-                </div>
+            {/* Floating Toggle Button - always visible in dev */}
+            {mounted && (
+                <button
+                    onClick={() => setIsEnabled(prev => !prev)}
+                    className="fixed bottom-4 right-4 z-9999 px-3 py-2 font-mono text-xs border transition-colors"
+                    style={{
+                        backgroundColor: isEnabled ? '#88FF66' : '#FFFFFF',
+                        borderColor: '#E0E0E0',
+                        color: '#050505',
+                    }}
+                >
+                    {isEnabled ? '[ AGENTATION ON ]' : '[ AGENTATION OFF ]'}
+                </button>
             )}
         </>
     )

@@ -56,18 +56,24 @@ export async function addComment(
     x: number,
     y: number,
     author: string = 'Agency User',
-    priority?: 'high' | 'medium' | 'low'
+    priority?: 'high' | 'medium' | 'low',
+    width?: number,
+    height?: number,
+    isGuest?: boolean
 ) {
     const newComment: Comment = {
         id: Math.random().toString(36).substring(7),
         markupId,
         x,
         y,
+        width,
+        height,
         content,
         author,
         createdAt: new Date().toISOString(),
         priority,
         status: 'open',
+        isGuest,
     }
 
     await db.addComment(newComment)

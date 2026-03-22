@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 
 export function SettingsClient() {
     const [emailNotifications, setEmailNotifications] = useState(true)
@@ -26,10 +27,16 @@ export function SettingsClient() {
     return (
         <div className="flex flex-col h-full" style={{ backgroundColor: "#F5F5F5" }}>
             {/* Page Header */}
-            <div className="p-12">
+            <div className="p-12 flex items-center justify-between">
                 <h1 className="font-mono text-[24px] font-semibold" style={{ color: "#050505" }}>
                     Settings
                 </h1>
+                <Link
+                    href="/"
+                    className="font-mono text-[11px] px-4 py-2 border transition-colors border-[#E0E0E0] bg-white text-[#050505] hover:bg-[#88FF66] hover:border-[#88FF66]"
+                >
+                    ← BACK TO PROJECTS
+                </Link>
             </div>
 
             {/* Settings Sections */}

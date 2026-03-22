@@ -45,9 +45,9 @@ export function CreateMarkupDialog({ onCreate }: CreateMarkupDialogProps) {
         return (
             <button
                 onClick={() => setOpen(true)}
-                className="btn-action-primary"
+                className="font-mono text-[11px] font-semibold px-3 py-1.5 border transition-colors w-full border-[#E0E0E0] bg-white text-[#050505] hover:bg-[#88FF66] hover:border-[#88FF66]"
             >
-                [+] Add Markup
+                + ADD PAGE
             </button>
         )
     }
@@ -61,41 +61,42 @@ export function CreateMarkupDialog({ onCreate }: CreateMarkupDialogProps) {
             />
 
             {/* Dialog */}
-            <div className="relative w-full max-w-md bg-background border border-border">
+            <div className="relative w-full max-w-md" style={{ backgroundColor: "#FFFFFF", border: "1px solid #E0E0E0" }}>
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                    <span className="font-mono text-xs uppercase font-medium">
-                        Add New Markup
+                <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "#E0E0E0" }}>
+                    <span className="font-mono text-[11px] uppercase font-semibold" style={{ color: "#050505" }}>
+                        ADD NEW PAGE
                     </span>
                     <button
                         onClick={() => setOpen(false)}
-                        className="font-mono text-xs text-muted-foreground hover:text-foreground"
+                        className="font-mono text-[11px] transition-colors hover:text-[#050505]"
+                        style={{ color: "#888888" }}
                     >
                         [×] Close
                     </button>
                 </div>
 
                 {/* Type Tabs */}
-                <div className="flex border-b border-border">
+                <div className="flex border-b" style={{ borderColor: "#E0E0E0" }}>
                     <button
                         onClick={() => setType("website")}
-                        className={`flex-1 px-4 py-2 font-mono text-xs uppercase ${
-                            type === "website"
-                                ? "bg-accent text-foreground"
-                                : "text-muted-foreground hover:text-foreground"
-                        }`}
+                        className="flex-1 px-4 py-2 font-mono text-[11px] uppercase transition-colors"
+                        style={{
+                            backgroundColor: type === "website" ? "#88FF66" : "#FFFFFF",
+                            color: "#050505",
+                        }}
                     >
-                        [W] Website
+                        [W] WEBSITE
                     </button>
                     <button
                         onClick={() => setType("image")}
-                        className={`flex-1 px-4 py-2 font-mono text-xs uppercase ${
-                            type === "image"
-                                ? "bg-accent text-foreground"
-                                : "text-muted-foreground hover:text-foreground"
-                        }`}
+                        className="flex-1 px-4 py-2 font-mono text-[11px] uppercase transition-colors"
+                        style={{
+                            backgroundColor: type === "image" ? "#88FF66" : "#FFFFFF",
+                            color: type === "image" ? "#050505" : "#888888",
+                        }}
                     >
-                        [I] Image
+                        [I] IMAGE
                     </button>
                 </div>
 
@@ -104,68 +105,72 @@ export function CreateMarkupDialog({ onCreate }: CreateMarkupDialogProps) {
                     {type === "website" ? (
                         <div className="flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="slash-label">Website URL</label>
+                                <label className="font-mono text-[9px] uppercase" style={{ color: "#888888" }}>/ WEBSITE URL</label>
                                 <input
                                     type="url"
                                     placeholder="https://example.com/page"
                                     required
                                     value={url}
                                     onChange={(e) => setUrl(e.target.value)}
-                                    className="w-full bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
+                                    className="w-full bg-transparent px-3 py-2 text-sm font-mono focus:outline-none"
+                                    style={{ border: "1px solid #E0E0E0", color: "#050505" }}
                                 />
                             </div>
                             <div className="flex flex-col gap-2">
-                                <label className="slash-label">Page Name</label>
+                                <label className="font-mono text-[9px] uppercase" style={{ color: "#888888" }}>/ PAGE NAME</label>
                                 <input
                                     type="text"
                                     placeholder="Homepage"
                                     required
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    className="w-full bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
+                                    className="w-full bg-transparent px-3 py-2 text-sm font-mono focus:outline-none"
+                                    style={{ border: "1px solid #E0E0E0", color: "#050505" }}
                                 />
                             </div>
                         </div>
                     ) : (
                         <div className="flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
-                                <label className="slash-label">Upload Image</label>
+                                <label className="font-mono text-[9px] uppercase" style={{ color: "#888888" }}>/ UPLOAD IMAGE</label>
                                 <input
                                     type="file"
                                     accept="image/*"
                                     onChange={handleFileChange}
                                     required
-                                    className="w-full bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground file:mr-4 file:py-1 file:px-2 file:border-0 file:text-xs file:font-mono file:bg-muted file:text-foreground"
+                                    className="w-full bg-transparent px-3 py-2 text-sm font-mono focus:outline-none file:mr-4 file:py-1 file:px-2 file:border-0 file:text-xs file:font-mono file:bg-[#F5F5F5] file:text-[#050505]"
+                                    style={{ border: "1px solid #E0E0E0", color: "#050505" }}
                                 />
                             </div>
                             <div className="flex flex-col gap-2">
-                                <label className="slash-label">Name</label>
+                                <label className="font-mono text-[9px] uppercase" style={{ color: "#888888" }}>/ NAME</label>
                                 <input
                                     type="text"
                                     placeholder="Design Mockup V2"
                                     required
                                     value={imageName}
                                     onChange={(e) => setImageName(e.target.value)}
-                                    className="w-full bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
+                                    className="w-full bg-transparent px-3 py-2 text-sm font-mono focus:outline-none"
+                                    style={{ border: "1px solid #E0E0E0", color: "#050505" }}
                                 />
                             </div>
                         </div>
                     )}
 
                     {/* Footer */}
-                    <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-border-light">
+                    <div className="flex justify-end gap-2 mt-6 pt-4 border-t" style={{ borderColor: "#E0E0E0" }}>
                         <button
                             type="button"
                             onClick={() => setOpen(false)}
-                            className="btn-action"
+                            className="font-mono text-[11px] px-4 py-2 border border-[#E0E0E0] text-[#888888] transition-colors hover:border-[#050505] hover:text-[#050505]"
                         >
-                            Cancel
+                            CANCEL
                         </button>
                         <button
                             type="submit"
-                            className="btn-action-primary"
+                            className="font-mono text-[11px] font-semibold px-4 py-2 bg-[#88FF66] border border-[#88FF66] text-[#050505] transition-colors hover:bg-[#6be043] hover:border-[#6be043]"
                         >
-                            Create Markup
+                            Create Page
                         </button>
                     </div>
                 </form>

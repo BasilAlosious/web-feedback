@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Maximize, Minimize } from "lucide-react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
@@ -36,6 +36,20 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     const [isFullscreen, setIsFullscreen] = useState(false)
     const handleFullscreen = () => setIsFullscreen(f => !f)
 
+    // Guest name state with localStorage persistence
+    const [guestName, setGuestName] = useState("Guest")
+    useEffect(() => {
+        if (isGuest) {
+            const stored = localStorage.getItem('feedback_guest_name')
+            if (stored) setGuestName(stored)
+        }
+    }, [isGuest])
+
+    const handleGuestNameChange = (name: string) => {
+        setGuestName(name)
+        localStorage.setItem('feedback_guest_name', name)
+    }
+
     const handleCanvasClick = (x: number, y: number) => {
         if (mode === "comment") {
             setNewComment({ x, y })
@@ -46,16 +60,18 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
         if (!newComment || !markup) return
 
         const tempId = Math.random().toString(36).substring(7)
+        const authorName = isGuest ? (guestName || "Guest") : "Agency User"
         const optimisticComment: Comment = {
             id: tempId,
             markupId: markup.id,
             x: newComment.x,
             y: newComment.y,
             content,
-            author: "Agency User",
+            author: authorName,
             createdAt: new Date().toISOString(),
             priority,
             status: 'open',
+            isGuest,
         }
 
         setComments(prev => [...prev, optimisticComment])
@@ -63,7 +79,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
         setShowThread(true)
 
         try {
-            const saved = await addComment(markup.id, content, newComment.x, newComment.y, "Agency User", priority)
+            const saved = await addComment(markup.id, content, newComment.x, newComment.y, authorName, priority, undefined, undefined, isGuest)
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch (error) {
             console.error("Failed to save comment", error)
@@ -221,16 +237,33 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                 </div>
             </div>
 
-            {/* Comment Thread Panel */}
+            {/* Comment Thread Panel with Guest Name Header */}
             {showThread && !isFullscreen && (
-                <CommentThread
-                    markupId={markupId}
-                    comments={comments}
-                    onClose={() => setShowThread(false)}
-                    onAddComment={() => {}}
-                    onUpdateStatus={handleUpdateStatus}
-                    onUpdatePriority={handleUpdatePriority}
-                />
+                <div className="flex flex-col h-full">
+                    {/* Guest Name Input Banner */}
+                    {isGuest && (
+                        <div className="flex-shrink-0 px-5 py-3 border-b" style={{ backgroundColor: "#F5F5F5", borderColor: "#E0E0E0" }}>
+                            <div className="flex items-center gap-2">
+                                <span className="font-mono text-[9px] uppercase text-[#888888]">Your Name:</span>
+                                <input
+                                    type="text"
+                                    value={guestName}
+                                    onChange={(e) => handleGuestNameChange(e.target.value)}
+                                    placeholder="Guest"
+                                    className="flex-1 bg-white border px-2 py-1 text-xs font-mono focus:outline-none focus:border-[#050505]"
+                                    style={{ borderColor: "#E0E0E0" }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                    <CommentThread
+                        markupId={markupId}
+                        comments={comments}
+                        onClose={() => setShowThread(false)}
+                        onUpdateStatus={handleUpdateStatus}
+                        onUpdatePriority={handleUpdatePriority}
+                    />
+                </div>
             )}
 
             {/* Share Dialog */}

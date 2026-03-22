@@ -59,20 +59,12 @@ export function DashboardClient({ initialProjects }: DashboardClientProps) {
         <div className="flex flex-col h-full bg-[#F5F5F5]">
             {/* Page Header */}
             <div className="p-12 flex items-center justify-between">
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col">
                     <h1 className="font-mono text-[24px] font-semibold" style={{ color: "#050505" }}>
                         Projects
                     </h1>
-                    <p className="font-mono text-[11px]" style={{ color: "#888888" }}>
-                        Click any project to open Canvas view
-                    </p>
                 </div>
-                <div
-                    className="font-mono text-[11px] font-semibold px-3 py-1"
-                    style={{ backgroundColor: "#88FF66", color: "#050505" }}
-                >
-                    {initialProjects.length}
-                </div>
+                <CreateProjectDialog onCreate={handleCreateProject} />
             </div>
 
             {/* Project Cards List */}
@@ -87,23 +79,23 @@ export function DashboardClient({ initialProjects }: DashboardClientProps) {
                                 <Link
                                     key={project.id}
                                     href={`/projects/${project.id}`}
-                                    className="flex items-center justify-between p-5 transition-all"
-                                    style={{
-                                        backgroundColor: isActive ? "#88FF66" : "#FFFFFF",
-                                        border: isActive ? "2px solid #88FF66" : "1px solid #E0E0E0",
-                                    }}
+                                    className={`group flex items-center justify-between p-5 transition-all border ${
+                                        isActive
+                                            ? "bg-[#88FF66] border-2 border-[#88FF66]"
+                                            : "bg-white border border-[#E0E0E0] hover:bg-[#F5F5F5] hover:border-[#050505]"
+                                    }`}
                                 >
                                     {/* Left Side - Project Info */}
                                     <div className="flex flex-col gap-1">
-                                        <h3
-                                            className="font-mono text-[14px] font-semibold"
-                                            style={{ color: "#050505" }}
-                                        >
+                                        <h3 className="font-mono text-[14px] font-semibold text-[#050505]">
                                             {project.name}
                                         </h3>
                                         <p
-                                            className="font-mono text-[9px]"
-                                            style={{ color: isActive ? "#050505" : "#888888" }}
+                                            className={`font-mono text-[9px] ${
+                                                isActive
+                                                    ? "text-[#050505]"
+                                                    : "text-[#888888] group-hover:text-[#050505]"
+                                            }`}
                                         >
                                             {project.markupCount} pages • {commentCount} comments • Last updated {formatTime(project.updatedAt)}
                                         </p>
@@ -111,8 +103,11 @@ export function DashboardClient({ initialProjects }: DashboardClientProps) {
 
                                     {/* Right Side - Arrow */}
                                     <div
-                                        className="font-mono text-[18px]"
-                                        style={{ color: isActive ? "#050505" : "#888888" }}
+                                        className={`font-mono text-[18px] ${
+                                            isActive
+                                                ? "text-[#050505]"
+                                                : "text-[#888888] group-hover:text-[#050505]"
+                                        }`}
                                     >
                                         →
                                     </div>

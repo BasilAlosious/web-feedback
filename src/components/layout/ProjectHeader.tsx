@@ -16,11 +16,14 @@ export function ProjectHeader({ projectName, currentView, projectId }: ProjectHe
                 className="flex items-center justify-between h-16 px-8"
                 style={{ backgroundColor: "#F5F5F5" }}
             >
-                {/* Left Side - Project Info */}
+                {/* Left Side - Back button above Project Info */}
                 <div className="flex flex-col gap-1">
-                    <div className="font-mono text-[9px] font-semibold uppercase" style={{ color: "#888888" }}>
-                        PROJECT
-                    </div>
+                    <Link
+                        href="/"
+                        className="font-mono text-[11px] transition-colors text-[#888888] hover:text-[#050505]"
+                    >
+                        ← BACK TO PROJECTS
+                    </Link>
                     <div className="font-mono text-[16px] font-semibold" style={{ color: "#050505" }}>
                         {projectName} — {currentView === "canvas" ? "Canvas View" : "Board View"}
                     </div>

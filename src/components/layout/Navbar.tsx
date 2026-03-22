@@ -7,15 +7,16 @@ export function Navbar() {
     const pathname = usePathname()
 
     const navItems = [
-        { key: "D", label: "Dashboard", href: "/" },
-        { key: "F", label: "Feedback", href: "/feedback" },
-        { key: "P", label: "Projects", href: "/projects" },
+        { key: "P", label: "Projects", href: "/" },
         { key: "S", label: "Settings", href: "/settings" },
     ]
 
     const isActive = (href: string) => {
-        if (href === "/") return pathname === "/"
-        return pathname.startsWith(href)
+        if (href === "/") {
+            // Projects is active on home AND when viewing individual projects
+            return pathname === "/" || pathname.startsWith("/projects")
+        }
+        return pathname === href || pathname.startsWith(href)
     }
 
     return (
