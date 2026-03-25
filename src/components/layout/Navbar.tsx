@@ -2,9 +2,12 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { logout } from "@/app/logout/actions"
+import { useUser } from "@/lib/user-context"
 
 export function Navbar() {
     const pathname = usePathname()
+    const user = useUser()
 
     const navItems = [
         { key: "P", label: "Projects", href: "/" },
@@ -21,7 +24,7 @@ export function Navbar() {
 
     return (
         <header className="sticky top-0 z-50 w-full h-12 border-b border-[#E0E0E0] bg-[#F5F5F5]">
-            <div className="flex h-full items-center px-8">
+            <div className="flex h-full items-center justify-between px-8">
                 {/* Global nav links */}
                 <nav className="flex items-center gap-8">
                     {navItems.map((item) => (
@@ -38,6 +41,23 @@ export function Navbar() {
                         </Link>
                     ))}
                 </nav>
+
+                {/* User info and logout */}
+                <div className="flex items-center gap-4">
+                    {user && (
+                        <span className="font-mono text-[11px] text-[#888888]">
+                            {user.name}
+                        </span>
+                    )}
+                    <form action={logout}>
+                        <button
+                            type="submit"
+                            className="font-mono text-[11px] text-[#888888] hover:text-[#050505] transition-colors"
+                        >
+                            [X] LOGOUT
+                        </button>
+                    </form>
+                </div>
             </div>
         </header>
     )

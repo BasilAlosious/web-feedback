@@ -1,7 +1,7 @@
 'use client'
 
 import { useFormStatus } from 'react-dom'
-import { login } from './actions'
+import { signup } from './actions'
 import { useState } from 'react'
 import Link from 'next/link'
 
@@ -13,16 +13,16 @@ function SubmitButton() {
             className="btn-action-primary w-full"
             disabled={pending}
         >
-            {pending ? '[...] Authenticating' : '[→] Login'}
+            {pending ? '[...] Creating Account' : '[+] Sign Up'}
         </button>
     )
 }
 
-export default function LoginPage() {
+export default function SignupPage() {
     const [error, setError] = useState<string | null>(null)
 
     async function handleSubmit(formData: FormData) {
-        const result = await login(formData)
+        const result = await signup(formData)
         if (result?.error) {
             setError(result.error)
         }
@@ -36,21 +36,32 @@ export default function LoginPage() {
                     <div className="status-widget-header">[ FEEDBACK_2.0 ]</div>
                 </div>
 
-                {/* Login Card */}
+                {/* Signup Card */}
                 <div className="border border-border bg-card">
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-border">
                         <h1 className="font-mono text-sm uppercase font-medium">
-                            Login
+                            Create Account
                         </h1>
                         <p className="font-mono text-xs text-muted-foreground mt-1">
-                            Enter your credentials to access the system
+                            Enter your details to get started
                         </p>
                     </div>
 
                     {/* Form */}
                     <form action={handleSubmit} className="p-6">
                         <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-2">
+                                <label className="slash-label">Name</label>
+                                <input
+                                    type="text"
+                                    name="name"
+                                    placeholder="Your name"
+                                    required
+                                    className="w-full bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
+                                />
+                            </div>
+
                             <div className="flex flex-col gap-2">
                                 <label className="slash-label">Email</label>
                                 <input
@@ -67,8 +78,9 @@ export default function LoginPage() {
                                 <input
                                     type="password"
                                     name="password"
-                                    placeholder="••••••••"
+                                    placeholder="Min 8 characters"
                                     required
+                                    minLength={8}
                                     className="w-full bg-transparent border border-border px-3 py-2 text-sm font-mono focus:outline-none focus:border-foreground"
                                 />
                             </div>
@@ -87,8 +99,8 @@ export default function LoginPage() {
 
                 {/* Footer */}
                 <div className="mt-6 text-center">
-                    <Link href="/signup" className="font-mono text-xs text-muted-foreground hover:text-foreground">
-                        Need an account? <span className="text-foreground">[+] Sign Up</span>
+                    <Link href="/login" className="font-mono text-xs text-muted-foreground hover:text-foreground">
+                        Already have an account? <span className="text-foreground">[→] Login</span>
                     </Link>
                 </div>
             </div>

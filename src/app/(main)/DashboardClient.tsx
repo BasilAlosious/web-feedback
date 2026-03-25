@@ -8,9 +8,10 @@ import { Project } from "@/lib/db"
 
 interface DashboardClientProps {
     initialProjects: Project[]
+    commentCounts: Record<string, number>
 }
 
-export function DashboardClient({ initialProjects }: DashboardClientProps) {
+export function DashboardClient({ initialProjects, commentCounts }: DashboardClientProps) {
     const pathname = usePathname()
 
     const handleCreateProject = async (name: string, url: string) => {
@@ -50,11 +51,6 @@ export function DashboardClient({ initialProjects }: DashboardClientProps) {
         return pathname.includes(`/projects/${projectId}`)
     }
 
-    // Calculate comment count (placeholder - would need to fetch from DB)
-    const getCommentCount = (project: Project) => {
-        return 0 // Placeholder
-    }
-
     return (
         <div className="flex flex-col h-full bg-[#F5F5F5]">
             {/* Page Header */}
@@ -73,7 +69,7 @@ export function DashboardClient({ initialProjects }: DashboardClientProps) {
                     <div className="flex flex-col gap-4">
                         {initialProjects.map((project) => {
                             const isActive = isProjectActive(project.id)
-                            const commentCount = getCommentCount(project)
+                            const commentCount = commentCounts[project.id] ?? 0
 
                             return (
                                 <Link

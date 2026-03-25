@@ -1,7 +1,16 @@
 {
   "projects": [
     {
+      "id": "n2akc",
+      "userId": "auuy48j",
+      "name": "Frankly",
+      "url": "https://frankly-staging-1.webflow.io/",
+      "markupCount": 1,
+      "updatedAt": "2026-03-25T09:27:28.095Z"
+    },
+    {
       "id": "h2we8",
+      "userId": "mohpoth",
       "name": "Basil",
       "url": "http://basenine.co",
       "markupCount": 2,
@@ -9,6 +18,7 @@
     },
     {
       "id": "r8k4pn",
+      "userId": "mohpoth",
       "name": "Share Test Project",
       "url": "http://example.com",
       "markupCount": 2,
@@ -17,12 +27,21 @@
   ],
   "markups": [
     {
+      "id": "r3c5l6",
+      "projectId": "n2akc",
+      "name": "Homepage",
+      "url": "https://frankly-staging-1.webflow.io/",
+      "viewport": "desktop",
+      "commentCount": 2,
+      "type": "website"
+    },
+    {
       "id": "hdvs9e",
       "projectId": "h2we8",
       "name": "Case Study - Shikenso",
       "url": "https://www.basenine.co/case-study/shikenso",
       "viewport": "desktop",
-      "commentCount": 1,
+      "commentCount": 3,
       "type": "website"
     },
     {
@@ -40,7 +59,7 @@
       "name": "homepage",
       "url": "https://basenine.webflow.io/",
       "viewport": "desktop",
-      "commentCount": 3,
+      "commentCount": 4,
       "type": "website"
     },
     {
@@ -99,7 +118,7 @@
       "content": "Change these images",
       "author": "Agency User",
       "createdAt": "2026-02-24T12:20:01.032Z",
-      "status": "in_progress"
+      "status": "open"
     },
     {
       "id": "wo20q",
@@ -109,8 +128,80 @@
       "content": "change the color here",
       "author": "Agency User",
       "createdAt": "2026-03-14T09:32:45.917Z",
-      "status": "open",
+      "status": "in_progress",
       "priority": "low"
+    },
+    {
+      "id": "d2d7",
+      "markupId": "hdvs9e",
+      "x": 72.65151515151516,
+      "y": 61.74863387978142,
+      "content": "update text",
+      "author": "Agency User",
+      "createdAt": "2026-03-21T17:26:05.796Z",
+      "priority": "high",
+      "status": "open"
+    },
+    {
+      "id": "p6evsw",
+      "markupId": "410ng",
+      "x": 25.063291139240505,
+      "y": 47.51693002257336,
+      "content": "Typo here",
+      "author": "Basil",
+      "createdAt": "2026-03-22T07:22:03.155Z",
+      "status": "open",
+      "isGuest": true
+    },
+    {
+      "id": "o1mx2p",
+      "markupId": "hdvs9e",
+      "x": 54.936708860759495,
+      "y": 37.3589164785553,
+      "content": "change the heading here",
+      "author": "Basil",
+      "createdAt": "2026-03-22T07:35:58.295Z",
+      "status": "open",
+      "isGuest": true,
+      "priority": "high"
+    },
+    {
+      "id": "1xuj8w",
+      "markupId": "r3c5l6",
+      "x": 13.059701492537313,
+      "y": 80.24539877300614,
+      "content": "change button animation",
+      "author": "basil",
+      "createdAt": "2026-03-25T09:33:56.427Z",
+      "status": "in_progress",
+      "isGuest": false
+    },
+    {
+      "id": "8rtpcj",
+      "markupId": "r3c5l6",
+      "x": 37.25,
+      "y": 33.22649572649573,
+      "content": "too close to each other",
+      "author": "mickey",
+      "createdAt": "2026-03-25T09:34:48.636Z",
+      "status": "open",
+      "isGuest": true
+    }
+  ],
+  "users": [
+    {
+      "id": "mohpoth",
+      "email": "basilalosious@gmail.com",
+      "name": "Basil",
+      "passwordHash": "$2b$10$qoRzA7cc3Ue1pEoY6jcSQeGegjtvY.C660tgby4GkOtl5GW2yGopa",
+      "createdAt": "2026-03-25T08:48:27.945Z"
+    },
+    {
+      "id": "auuy48j",
+      "email": "figma@basenine.co",
+      "name": "basil",
+      "passwordHash": "$2b$10$1Mw./rkbRgwoR06Vam6ek.9C/mE7BDyfUDUYboCz3ZOJ237sxLzPS",
+      "createdAt": "2026-03-25T09:27:08.467Z"
     }
   ]
 }

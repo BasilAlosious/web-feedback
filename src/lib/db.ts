@@ -6,6 +6,7 @@
 
 export interface Project {
     id: string
+    userId: string  // Owner of the project
     name: string
     url: string
     markupCount: number
@@ -37,6 +38,14 @@ export interface Comment {
     isGuest?: boolean  // true for guest comments via share links
 }
 
+export interface User {
+    id: string
+    email: string
+    name: string
+    passwordHash: string
+    createdAt: string
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // JSON adapter (local dev, no Postgres required)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,16 +56,32 @@ function jsonDb() {
     const path = require('path') as typeof import('path')
 
     const DB_PATH = path.join(process.cwd(), 'data', 'db.json')
-    const empty   = { projects: [] as Project[], markups: [] as Markup[], comments: [] as Comment[] }
+    const empty   = { users: [] as User[], projects: [] as Project[], markups: [] as Markup[], comments: [] as Comment[] }
 
     function read() {
         if (!fs.existsSync(DB_PATH)) { fs.writeFileSync(DB_PATH, JSON.stringify(empty, null, 2)); return empty }
-        return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8')) as typeof empty
+        const data = JSON.parse(fs.readFileSync(DB_PATH, 'utf-8'))
+        // Ensure users array exists for existing db.json files
+        if (!data.users) data.users = []
+        return data as typeof empty
     }
     function write(data: typeof empty) { fs.writeFileSync(DB_PATH, JSON.stringify(data, null, 2)) }
 
     return {
-        getProjects: async (): Promise<Project[]> => read().projects,
+        // User methods
+        getUserByEmail: async (email: string): Promise<User | undefined> =>
+            read().users.find(u => u.email.toLowerCase() === email.toLowerCase()),
+
+        getUserById: async (id: string): Promise<User | undefined> =>
+            read().users.find(u => u.id === id),
+
+        createUser: async (u: User): Promise<User> => {
+            const d = read(); d.users.push(u); write(d); return u
+        },
+
+        // Project methods
+        getProjects: async (userId: string): Promise<Project[]> =>
+            read().projects.filter(p => p.userId === userId),
 
         addProject: async (p: Project): Promise<Project> => {
             const d = read(); d.projects.unshift(p); write(d); return p
@@ -108,6 +133,16 @@ function jsonDb() {
             const ids = new Set(d.markups.filter(m => m.projectId === projectId).map(m => m.id))
             return d.comments.filter(c => ids.has(c.markupId))
         },
+
+        getCommentCountsForProjects: async (projectIds: string[]): Promise<Record<string, number>> => {
+            const d = read()
+            const result: Record<string, number> = {}
+            for (const projectId of projectIds) {
+                const markupIds = new Set(d.markups.filter(m => m.projectId === projectId).map(m => m.id))
+                result[projectId] = d.comments.filter(c => markupIds.has(c.markupId)).length
+            }
+            return result
+        },
     }
 }
 
@@ -118,19 +153,42 @@ function jsonDb() {
 function postgresDb() {
     const { sql } = require('@vercel/postgres') as typeof import('@vercel/postgres')
 
-    const SP = `id, name, url, markup_count AS "markupCount", updated_at AS "updatedAt"`
+    const SU = `id, email, name, password_hash AS "passwordHash", created_at AS "createdAt"`
+    const SP = `id, user_id AS "userId", name, url, markup_count AS "markupCount", updated_at AS "updatedAt"`
     const SM = `id, project_id AS "projectId", name, url, viewport, comment_count AS "commentCount", type`
     const SC = `id, markup_id AS "markupId", x, y, width, height, content, author, created_at AS "createdAt", priority, status, is_guest AS "isGuest"`
 
     return {
-        getProjects: async (): Promise<Project[]> => {
-            const { rows } = await sql.query(`SELECT ${SP} FROM projects ORDER BY updated_at DESC`)
+        // User methods
+        getUserByEmail: async (email: string): Promise<User | undefined> => {
+            const { rows } = await sql.query(
+                `SELECT ${SU} FROM users WHERE LOWER(email) = LOWER($1)`, [email]
+            )
+            return rows[0] as User | undefined
+        },
+
+        getUserById: async (id: string): Promise<User | undefined> => {
+            const { rows } = await sql.query(`SELECT ${SU} FROM users WHERE id = $1`, [id])
+            return rows[0] as User | undefined
+        },
+
+        createUser: async (u: User): Promise<User> => {
+            await sql`INSERT INTO users (id, email, name, password_hash, created_at)
+                      VALUES (${u.id}, ${u.email}, ${u.name}, ${u.passwordHash}, ${u.createdAt})`
+            return u
+        },
+
+        // Project methods
+        getProjects: async (userId: string): Promise<Project[]> => {
+            const { rows } = await sql.query(
+                `SELECT ${SP} FROM projects WHERE user_id = $1 ORDER BY updated_at DESC`, [userId]
+            )
             return rows as Project[]
         },
 
         addProject: async (p: Project): Promise<Project> => {
-            await sql`INSERT INTO projects (id, name, url, markup_count, updated_at)
-                      VALUES (${p.id}, ${p.name}, ${p.url}, ${p.markupCount}, ${p.updatedAt})`
+            await sql`INSERT INTO projects (id, user_id, name, url, markup_count, updated_at)
+                      VALUES (${p.id}, ${p.userId}, ${p.name}, ${p.url}, ${p.markupCount}, ${p.updatedAt})`
             return p
         },
 
@@ -202,6 +260,22 @@ function postgresDb() {
                 [projectId]
             )
             return rows as Comment[]
+        },
+
+        getCommentCountsForProjects: async (projectIds: string[]): Promise<Record<string, number>> => {
+            if (projectIds.length === 0) return {}
+            const { rows } = await sql.query(
+                `SELECT m.project_id, COUNT(c.id)::int as count
+                 FROM markups m
+                 LEFT JOIN comments c ON c.markup_id = m.id
+                 WHERE m.project_id = ANY($1)
+                 GROUP BY m.project_id`,
+                [projectIds]
+            )
+            const result: Record<string, number> = {}
+            for (const projectId of projectIds) result[projectId] = 0
+            for (const row of rows) result[row.project_id] = row.count
+            return result
         },
     }
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { Markup, Comment, Project } from "@/lib/db"
 import { IframeRenderer } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
@@ -18,6 +19,7 @@ import {
     updateCommentPriority,
 } from "@/app/actions"
 import { ProjectHeader } from "@/components/layout/ProjectHeader"
+import { useUser } from "@/lib/user-context"
 
 interface ProjectClientProps {
     projectId: string
@@ -57,6 +59,7 @@ export function ProjectClient({
     initialSelectedMarkup,
     initialComments,
 }: ProjectClientProps) {
+    const user = useUser()
     const [markups, setMarkups] = useState<Markup[]>(initialMarkups)
     const [selectedMarkup, setSelectedMarkup] = useState<Markup | undefined>(initialSelectedMarkup)
     const [comments, setComments] = useState<Comment[]>(initialComments)
@@ -139,6 +142,7 @@ export function ProjectClient({
     const handleSaveComment = async (content: string, priority?: Priority) => {
         if (!newComment || !selectedMarkup) return
         const tempId = Math.random().toString(36).substring(7)
+        const authorName = user?.name || "Agency User"
         const optimistic: Comment = {
             id: tempId,
             markupId: selectedMarkup.id,
@@ -147,7 +151,7 @@ export function ProjectClient({
             width: newComment.width,
             height: newComment.height,
             content,
-            author: "Agency User",
+            author: authorName,
             createdAt: new Date().toISOString(),
             priority,
             status: 'open',
@@ -161,7 +165,7 @@ export function ProjectClient({
                 content,
                 newComment.x,
                 newComment.y,
-                "Agency User",
+                authorName,
                 priority,
                 newComment.width,
                 newComment.height,
@@ -288,6 +292,33 @@ export function ProjectClient({
             {/* LEFT: Pages panel - hidden in fullscreen */}
             {!isFullscreen && (
             <aside className="border-r border-border flex flex-col overflow-hidden bg-white">
+                {/* Mode Toggle */}
+                <div className="p-5 border-b border-border flex-shrink-0">
+                    <div className="font-mono text-[9px] font-semibold uppercase text-[#888888] mb-3">Mode</div>
+                    <div className="flex border border-[#E0E0E0]">
+                        <button
+                            onClick={() => setMode("comment")}
+                            className={`flex-1 px-3 py-2 font-mono text-[11px] text-center transition-colors ${
+                                mode === "comment"
+                                    ? "font-semibold bg-[#050505] text-white"
+                                    : "text-[#888888] hover:bg-[#F5F5F5]"
+                            }`}
+                        >
+                            COMMENT
+                        </button>
+                        <button
+                            onClick={() => setMode("browse")}
+                            className={`flex-1 px-3 py-2 font-mono text-[11px] text-center transition-colors ${
+                                mode === "browse"
+                                    ? "font-semibold bg-[#050505] text-white"
+                                    : "text-[#888888] hover:bg-[#F5F5F5]"
+                            }`}
+                        >
+                            BROWSE
+                        </button>
+                    </div>
+                </div>
+
                 {/* Share section */}
                 <div className="p-5 border-b border-border flex-shrink-0">
                     <div className="font-mono text-[9px] font-semibold uppercase text-[#888888] mb-3">Share</div>

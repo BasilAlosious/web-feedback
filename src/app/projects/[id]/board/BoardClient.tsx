@@ -27,10 +27,10 @@ const NEXT_STATUS: Record<string, NonNullable<Comment["status"]>> = {
 // Cycling order: none → high → medium → low → none
 const PRIORITY_CYCLE: Array<Comment["priority"]> = [undefined, "high", "medium", "low"]
 
-const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
-    high:   { label: "[!!] HIGH", className: "text-red-400" },
-    medium: { label: "[~]  MED",  className: "text-yellow-400" },
-    low:    { label: "[-]  LOW",  className: "text-muted-foreground" },
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bgColor: string }> = {
+    high:   { label: "HIGH", color: "#EF4444", bgColor: "#FEE2E2" },
+    medium: { label: "MED",  color: "#F59E0B", bgColor: "#FEF3C7" },
+    low:    { label: "LOW",  color: "#6B7280", bgColor: "#F3F4F6" },
 }
 
 const COLUMN_COLOR: Record<string, string> = {
@@ -190,30 +190,53 @@ export function BoardClient({ projectId, projectName, markupNames, initialCommen
                                                 draggable
                                                 onDragStart={(e) => handleDragStart(e, comment.id)}
                                                 onDragEnd={handleDragEnd}
-                                                className="p-4 flex flex-col gap-2 cursor-grab active:cursor-grabbing select-none transition-colors"
+                                                className="p-4 flex flex-col gap-3 cursor-grab active:cursor-grabbing select-none transition-colors"
                                                 style={{
                                                     backgroundColor: "#FFFFFF",
                                                     border: "1px solid #E0E0E0"
                                                 }}
                                             >
-                                                {/* Task Name */}
-                                                <p className="font-mono text-[11px] leading-relaxed" style={{ color: "#050505" }}>
-                                                    {comment.content}
-                                                </p>
-
-                                                {/* Footer: timestamp + badge */}
+                                                {/* Header: Author + Priority */}
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <span className="font-mono text-[9px]" style={{ color: "#A0A0A0" }}>
-                                                        {formatTime(comment.createdAt)}
-                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                        <div
+                                                            className="w-5 h-5 rounded-full flex items-center justify-center font-mono text-[9px] font-semibold"
+                                                            style={{ backgroundColor: "#F5F5F5", color: "#050505" }}
+                                                        >
+                                                            {comment.author?.charAt(0).toUpperCase() || "?"}
+                                                        </div>
+                                                        <span className="font-mono text-[10px] font-medium" style={{ color: "#050505" }}>
+                                                            {comment.author || "Unknown"}
+                                                        </span>
+                                                        {comment.isGuest && (
+                                                            <span className="font-mono text-[8px] px-1 py-0.5" style={{ backgroundColor: "#F5F5F5", color: "#888888" }}>
+                                                                GUEST
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     {priCfg && (
                                                         <div
                                                             className="px-2 py-0.5 font-mono text-[8px] font-semibold"
-                                                            style={{ backgroundColor: "#F5F5F5", color: "#050505" }}
+                                                            style={{ backgroundColor: priCfg.bgColor, color: priCfg.color }}
                                                         >
                                                             {priCfg.label}
                                                         </div>
                                                     )}
+                                                </div>
+
+                                                {/* Comment Content */}
+                                                <p className="font-mono text-[11px] leading-relaxed" style={{ color: "#050505" }}>
+                                                    {comment.content}
+                                                </p>
+
+                                                {/* Footer: Page name + timestamp */}
+                                                <div className="flex items-center justify-between gap-2 pt-1 border-t" style={{ borderColor: "#F0F0F0" }}>
+                                                    <span className="font-mono text-[9px]" style={{ color: "#888888" }}>
+                                                        {pageName}
+                                                    </span>
+                                                    <span className="font-mono text-[9px]" style={{ color: "#A0A0A0" }}>
+                                                        {formatTime(comment.createdAt)}
+                                                    </span>
                                                 </div>
                                             </div>
                                         )

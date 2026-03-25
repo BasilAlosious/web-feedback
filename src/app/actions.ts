@@ -2,8 +2,12 @@
 
 import { revalidatePath } from 'next/cache'
 import { db, Project, Markup, Comment } from '@/lib/db'
+import { getCurrentUser } from '@/lib/auth'
 
 export async function createProject(formData: FormData) {
+    const user = await getCurrentUser()
+    if (!user) return { error: 'Not authenticated' }
+
     const title = formData.get('title') as string
     const url = formData.get('url') as string
 
@@ -11,6 +15,7 @@ export async function createProject(formData: FormData) {
 
     const newProject: Project = {
         id: Math.random().toString(36).substring(7),
+        userId: user.id,
         name: title,
         url,
         markupCount: 0,

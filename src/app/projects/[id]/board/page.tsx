@@ -1,14 +1,20 @@
 import { db } from "@/lib/db"
 import { BoardClient } from "./BoardClient"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth"
 
 interface BoardPageProps {
     params: { id: string }
 }
 
 export default async function BoardPage({ params }: BoardPageProps) {
+    const user = await getCurrentUser()
+    if (!user) {
+        redirect('/login')
+    }
+
     const { id } = await params
-    const projects = await db.getProjects()
+    const projects = await db.getProjects(user.id)
     const project = projects.find(p => p.id === id)
     if (!project) notFound()
 

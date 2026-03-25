@@ -11,6 +11,7 @@ import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
 import { addComment, updateCommentStatus, updateCommentPriority } from "@/app/actions"
 import { ShareDialog } from "@/components/project/ShareDialog"
+import { useUser } from "@/lib/user-context"
 
 interface MarkupClientProps {
     markupId: string
@@ -21,6 +22,7 @@ interface MarkupClientProps {
 }
 
 export function MarkupClient({ markupId, projectId, initialData, initialComments, isGuest = false }: MarkupClientProps) {
+    const user = useUser()
     const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop")
     const [mode, setMode] = useState<"browse" | "comment">("comment")
     const [useProxy] = useState(true)
@@ -60,7 +62,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
         if (!newComment || !markup) return
 
         const tempId = Math.random().toString(36).substring(7)
-        const authorName = isGuest ? (guestName || "Guest") : "Agency User"
+        const authorName = isGuest ? (guestName || "Guest") : (user?.name || "Agency User")
         const optimisticComment: Comment = {
             id: tempId,
             markupId: markup.id,

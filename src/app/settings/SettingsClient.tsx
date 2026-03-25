@@ -2,8 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { useUser } from "@/lib/user-context"
 
 export function SettingsClient() {
+    const user = useUser()
     const [emailNotifications, setEmailNotifications] = useState(true)
     const [taskNotifications, setTaskNotifications] = useState(false)
     const [inviteEmail, setInviteEmail] = useState("")
@@ -57,7 +59,7 @@ export function SettingsClient() {
                                     Name
                                 </span>
                                 <span className="font-mono text-[11px]" style={{ color: "#888888" }}>
-                                    Basil Alosious
+                                    {user?.name || "Unknown"}
                                 </span>
                             </div>
 
@@ -67,7 +69,7 @@ export function SettingsClient() {
                                     Email
                                 </span>
                                 <span className="font-mono text-[11px]" style={{ color: "#888888" }}>
-                                    basil@example.com
+                                    {user?.email || "Unknown"}
                                 </span>
                             </div>
                         </div>

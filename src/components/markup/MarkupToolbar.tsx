@@ -71,22 +71,47 @@ export function MarkupToolbar({
                     </button>
                 </div>
 
-                {/* Mode */}
-                <div className="flex items-center gap-2">
-                    <span className="slash-label mr-2">Mode</span>
-                    <button
-                        onClick={() => onModeChange("browse")}
-                        className={`nav-item ${mode === "browse" ? "text-foreground" : ""}`}
-                    >
-                        <span className="text-foreground">[B]</span> Browse
-                    </button>
-                    <button
-                        onClick={() => onModeChange("comment")}
-                        className={`nav-item ${mode === "comment" ? "text-foreground" : ""}`}
-                    >
-                        <span className="text-foreground">[C]</span> Comment
-                    </button>
-                </div>
+                {/* Mode - Prominent toggle for guests */}
+                {isGuest ? (
+                    <div className="flex border border-[#E0E0E0]">
+                        <button
+                            onClick={() => onModeChange("comment")}
+                            className={`px-4 py-1.5 font-mono text-[11px] font-semibold transition-colors ${
+                                mode === "comment"
+                                    ? "bg-[#88FF66] text-[#050505]"
+                                    : "bg-white text-[#888888] hover:bg-[#F5F5F5]"
+                            }`}
+                        >
+                            ✦ COMMENT
+                        </button>
+                        <button
+                            onClick={() => onModeChange("browse")}
+                            className={`px-4 py-1.5 font-mono text-[11px] font-semibold transition-colors ${
+                                mode === "browse"
+                                    ? "bg-[#050505] text-white"
+                                    : "bg-white text-[#888888] hover:bg-[#F5F5F5]"
+                            }`}
+                        >
+                            BROWSE
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <span className="slash-label mr-2">Mode</span>
+                        <button
+                            onClick={() => onModeChange("browse")}
+                            className={`nav-item ${mode === "browse" ? "text-foreground" : ""}`}
+                        >
+                            <span className="text-foreground">[B]</span> Browse
+                        </button>
+                        <button
+                            onClick={() => onModeChange("comment")}
+                            className={`nav-item ${mode === "comment" ? "text-foreground" : ""}`}
+                        >
+                            <span className="text-foreground">[C]</span> Comment
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* Right: Actions */}
