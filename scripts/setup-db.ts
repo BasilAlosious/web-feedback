@@ -65,9 +65,15 @@ async function main() {
             created_at TEXT NOT NULL,
             priority   TEXT,
             status     TEXT NOT NULL DEFAULT 'open',
-            is_guest   BOOLEAN DEFAULT false
+            is_guest   BOOLEAN DEFAULT false,
+            scroll_y   DOUBLE PRECISION,
+            scroll_x   DOUBLE PRECISION
         )
     `
+
+    // Migration: add scroll columns if table already existed without them
+    await sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS scroll_y DOUBLE PRECISION`
+    await sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS scroll_x DOUBLE PRECISION`
 
     console.log('Tables created.')
 
@@ -113,8 +119,9 @@ async function main() {
     console.log(`Seeding ${data.comments.length} comments...`)
     for (const c of data.comments) {
         await sql`
-            INSERT INTO comments (id, markup_id, x, y, width, height, content, author, created_at, priority, status, is_guest)
+            INSERT INTO comments (id, markup_id, x, y, width, height, scroll_y, scroll_x, content, author, created_at, priority, status, is_guest)
             VALUES (${c.id}, ${c.markupId}, ${c.x}, ${c.y}, ${c.width ?? null}, ${c.height ?? null},
+                    ${c.scrollY ?? null}, ${c.scrollX ?? null},
                     ${c.content}, ${c.author}, ${c.createdAt}, ${c.priority ?? null}, ${c.status ?? 'open'}, ${c.isGuest ?? false})
             ON CONFLICT (id) DO NOTHING
         `
