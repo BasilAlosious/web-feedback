@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Maximize, Minimize } from "lucide-react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
-import { IframeRenderer, ScrollState } from "@/components/markup/IframeRenderer"
+import { IframeRenderer } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
 import { Markup, Comment } from "@/lib/db"
 import Link from "next/link"
@@ -35,12 +35,6 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
     const [showShare, setShowShare] = useState(false)
 
     const containerRef = useRef<HTMLDivElement>(null)
-
-    // Track iframe scroll position for anchoring comment pins to content
-    const [scrollState, setScrollState] = useState({ scrollY: 0, scrollX: 0 })
-    const handleScrollChange = useCallback((scroll: ScrollState) => {
-        setScrollState({ scrollY: scroll.scrollY, scrollX: scroll.scrollX })
-    }, [])
 
     // In-app fullscreen (hides all panels, stays within browser window)
     const [isFullscreen, setIsFullscreen] = useState(false)
@@ -247,37 +241,23 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                                 viewport={viewport}
                                 mode={mode}
                                 onCommentClick={handleCanvasClick}
-                                onScrollChange={handleScrollChange}
                             >
-                                {/* Comments - only visible in comment mode, anchored to content */}
+                                {/* Comments - only visible in comment mode, fixed at placed position */}
                                 {mode === "comment" && (
                                     <div className="absolute inset-0 z-20 pointer-events-none">
-                                        {comments.map((comment, i) => {
-                                            // Anchor pins to content by adjusting for scroll delta
-                                            const h = containerRef.current?.clientHeight || 1
-                                            const w = containerRef.current?.clientWidth || 1
-                                            const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
-                                            const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
-                                            const adjustedY = comment.y - dy
-                                            const adjustedX = comment.x - dx
-
-                                            // Hide if scrolled out of view
-                                            if (adjustedY < -5 || adjustedY > 105) return null
-
-                                            return (
-                                                <div key={comment.id} className="pointer-events-auto">
-                                                    <CommentPin
-                                                        x={adjustedX}
-                                                        y={adjustedY}
-                                                        number={i + 1}
-                                                        author={comment.author}
-                                                        content={comment.content}
-                                                        priority={comment.priority}
-                                                        onClick={() => setShowThread(true)}
-                                                    />
-                                                </div>
-                                            )
-                                        })}
+                                        {comments.map((comment, i) => (
+                                            <div key={comment.id} className="pointer-events-auto">
+                                                <CommentPin
+                                                    x={comment.x}
+                                                    y={comment.y}
+                                                    number={i + 1}
+                                                    author={comment.author}
+                                                    content={comment.content}
+                                                    priority={comment.priority}
+                                                    onClick={() => setShowThread(true)}
+                                                />
+                                            </div>
+                                        ))}
 
                                         {newComment && (
                                             <div className="pointer-events-auto">
