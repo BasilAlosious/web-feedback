@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { Markup, Comment, Project } from "@/lib/db"
-import { IframeRenderer } from "@/components/markup/IframeRenderer"
+import { IframeRenderer, ScrollState } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
 import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
@@ -66,8 +66,15 @@ export function ProjectClient({
     const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop")
     const [mode, setMode] = useState<"browse" | "comment">("comment")
     const [useProxy] = useState(true)
-    const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number } | null>(null)
+    const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number; scrollY?: number; scrollX?: number } | null>(null)
     const [hoveredComment, setHoveredComment] = useState<Comment | null>(null)
+    const canvasRef = useRef<HTMLDivElement>(null)
+
+    // Track iframe scroll for anchoring pins to content
+    const [scrollState, setScrollState] = useState({ scrollY: 0, scrollX: 0 })
+    const handleScrollChange = useCallback((scroll: ScrollState) => {
+        setScrollState({ scrollY: scroll.scrollY, scrollX: scroll.scrollX })
+    }, [])
 
     // Filters
     const [statusFilter, setStatusFilter] = useState<string | null>(null)
@@ -133,9 +140,9 @@ export function ProjectClient({
     }
 
     // ── Comment creation ────────────────────────────────────────────────────
-    const handleCanvasClick = (x: number, y: number, width?: number, height?: number) => {
+    const handleCanvasClick = (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number) => {
         if (mode === "comment") {
-            setNewComment({ x, y, width, height })
+            setNewComment({ x, y, width, height, scrollY, scrollX })
         }
     }
 
@@ -150,6 +157,8 @@ export function ProjectClient({
             y: newComment.y,
             width: newComment.width,
             height: newComment.height,
+            scrollY: newComment.scrollY,
+            scrollX: newComment.scrollX,
             content,
             author: authorName,
             createdAt: new Date().toISOString(),
@@ -169,7 +178,9 @@ export function ProjectClient({
                 priority,
                 newComment.width,
                 newComment.height,
-                false  // isGuest
+                false,  // isGuest
+                newComment.scrollY,
+                newComment.scrollX
             )
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch {
@@ -618,6 +629,7 @@ export function ProjectClient({
 
                         {/* Dot-grid canvas */}
                         <div
+                            ref={canvasRef}
                             className={`relative flex-1 ${mode === "comment" ? "overflow-hidden" : "overflow-auto"}`}
                             style={{
                                 backgroundImage: "radial-gradient(#D0D0D0 1px, transparent 1px)",
@@ -633,24 +645,37 @@ export function ProjectClient({
                                     height: `${100 / (zoomLevel / 100)}%`,
                                 }}
                             >
-                            {/* Comment pins — only visible in comment mode */}
+                            {/* Comment pins — only visible in comment mode, anchored to content */}
                             {mode === "comment" && (
                             <div className="absolute inset-0 z-20 pointer-events-none">
-                                {visibleComments.map((comment, i) => (
-                                    <div key={comment.id} className="pointer-events-auto">
-                                        <CommentPin
-                                            x={comment.x}
-                                            y={comment.y}
-                                            width={comment.width}
-                                            height={comment.height}
-                                            number={i + 1}
-                                            author={comment.author}
-                                            content={comment.content}
-                                            priority={comment.priority}
-                                            isHighlighted={hoveredComment?.id === comment.id}
-                                        />
-                                    </div>
-                                ))}
+                                {visibleComments.map((comment, i) => {
+                                    // Anchor pins to content by adjusting for scroll delta
+                                    const h = canvasRef.current?.clientHeight || 1
+                                    const w = canvasRef.current?.clientWidth || 1
+                                    const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
+                                    const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
+                                    const adjustedY = comment.y - dy
+                                    const adjustedX = comment.x - dx
+
+                                    // Hide if scrolled out of view
+                                    if (adjustedY < -5 || adjustedY > 105) return null
+
+                                    return (
+                                        <div key={comment.id} className="pointer-events-auto">
+                                            <CommentPin
+                                                x={adjustedX}
+                                                y={adjustedY}
+                                                width={comment.width}
+                                                height={comment.height}
+                                                number={i + 1}
+                                                author={comment.author}
+                                                content={comment.content}
+                                                priority={comment.priority}
+                                                isHighlighted={hoveredComment?.id === comment.id}
+                                            />
+                                        </div>
+                                    )
+                                })}
                                 {newComment && (
                                     <div className="pointer-events-auto">
                                         <CommentPin
@@ -687,6 +712,7 @@ export function ProjectClient({
                                     viewport={viewport}
                                     mode={mode}
                                     onCommentClick={handleCanvasClick}
+                                    onScrollChange={handleScrollChange}
                                     highlightedComment={hoveredComment ? {
                                         x: hoveredComment.x,
                                         y: hoveredComment.y,
