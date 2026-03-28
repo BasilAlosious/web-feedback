@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 interface CanvasRendererProps {
@@ -8,11 +8,12 @@ interface CanvasRendererProps {
     mode: "browse" | "comment"
     onCommentClick?: (x: number, y: number, width?: number, height?: number) => void
     highlightedComment?: { x: number; y: number; width?: number; height?: number } | null
+    children?: ReactNode  // Comment pins to render inside the scrollable area
 }
 
 const MIN_DRAG_DISTANCE = 10
 
-export function CanvasRenderer({ imageUrl, mode, onCommentClick, highlightedComment }: CanvasRendererProps) {
+export function CanvasRenderer({ imageUrl, mode, onCommentClick, highlightedComment, children }: CanvasRendererProps) {
     const containerRef = useRef<HTMLDivElement>(null)
     const imageRef = useRef<HTMLImageElement>(null)
 
@@ -174,6 +175,9 @@ export function CanvasRenderer({ imageUrl, mode, onCommentClick, highlightedComm
                         }}
                     />
                 )}
+
+                {/* Comment pins - rendered inside container so they scroll with image */}
+                {children}
             </div>
         </div>
     )

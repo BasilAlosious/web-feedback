@@ -64,7 +64,9 @@ export async function addComment(
     priority?: 'high' | 'medium' | 'low',
     width?: number,
     height?: number,
-    isGuest?: boolean
+    isGuest?: boolean,
+    scrollY?: number,
+    scrollX?: number
 ) {
     const newComment: Comment = {
         id: Math.random().toString(36).substring(7),
@@ -73,6 +75,8 @@ export async function addComment(
         y,
         width,
         height,
+        scrollY,
+        scrollX,
         content,
         author,
         createdAt: new Date().toISOString(),

@@ -30,6 +30,8 @@ export interface Comment {
     y: number
     width?: number   // percentage-based width for area selection (0-100)
     height?: number  // percentage-based height for area selection (0-100)
+    scrollY?: number // pixels - scroll position when comment was placed (for anchoring)
+    scrollX?: number // pixels - horizontal scroll position when comment was placed
     content: string
     author: string
     createdAt: string
@@ -156,7 +158,7 @@ function postgresDb() {
     const SU = `id, email, name, password_hash AS "passwordHash", created_at AS "createdAt"`
     const SP = `id, user_id AS "userId", name, url, markup_count AS "markupCount", updated_at AS "updatedAt"`
     const SM = `id, project_id AS "projectId", name, url, viewport, comment_count AS "commentCount", type`
-    const SC = `id, markup_id AS "markupId", x, y, width, height, content, author, created_at AS "createdAt", priority, status, is_guest AS "isGuest"`
+    const SC = `id, markup_id AS "markupId", x, y, width, height, scroll_y AS "scrollY", scroll_x AS "scrollX", content, author, created_at AS "createdAt", priority, status, is_guest AS "isGuest"`
 
     return {
         // User methods
@@ -234,8 +236,8 @@ function postgresDb() {
         },
 
         addComment: async (c: Comment): Promise<Comment> => {
-            await sql`INSERT INTO comments (id, markup_id, x, y, width, height, content, author, created_at, priority, status, is_guest)
-                      VALUES (${c.id}, ${c.markupId}, ${c.x}, ${c.y}, ${c.width ?? null}, ${c.height ?? null}, ${c.content}, ${c.author},
+            await sql`INSERT INTO comments (id, markup_id, x, y, width, height, scroll_y, scroll_x, content, author, created_at, priority, status, is_guest)
+                      VALUES (${c.id}, ${c.markupId}, ${c.x}, ${c.y}, ${c.width ?? null}, ${c.height ?? null}, ${c.scrollY ?? null}, ${c.scrollX ?? null}, ${c.content}, ${c.author},
                               ${c.createdAt}, ${c.priority ?? null}, ${c.status ?? 'open'}, ${c.isGuest ?? false})`
             await sql`UPDATE markups SET comment_count = comment_count + 1 WHERE id = ${c.markupId}`
             return c
@@ -251,7 +253,7 @@ function postgresDb() {
 
         getCommentsForProject: async (projectId: string): Promise<Comment[]> => {
             const { rows } = await sql.query(
-                `SELECT c.id, c.markup_id AS "markupId", c.x, c.y, c.width, c.height, c.content, c.author,
+                `SELECT c.id, c.markup_id AS "markupId", c.x, c.y, c.width, c.height, c.scroll_y AS "scrollY", c.scroll_x AS "scrollX", c.content, c.author,
                         c.created_at AS "createdAt", c.priority, c.status, c.is_guest AS "isGuest"
                  FROM comments c
                  INNER JOIN markups m ON c.markup_id = m.id

@@ -1,14 +1,25 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect, ReactNode } from "react"
 import { cn } from "@/lib/utils"
+
+export interface ScrollState {
+    scrollY: number
+    scrollX: number
+    documentHeight: number
+    documentWidth: number
+    viewportHeight: number
+    viewportWidth: number
+}
 
 interface IframeRendererProps {
     url: string
     viewport: "desktop" | "tablet" | "mobile"
     mode: "browse" | "comment"
-    onCommentClick?: (x: number, y: number, width?: number, height?: number) => void
-    highlightedComment?: { x: number; y: number; width?: number; height?: number } | null
+    onCommentClick?: (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number) => void
+    highlightedComment?: { x: number; y: number; width?: number; height?: number; scrollY?: number } | null
+    children?: ReactNode  // Comment pins to render inside
+    onScrollChange?: (scroll: ScrollState) => void  // Callback when iframe scrolls
 }
 
 // Minimum drag distance (in pixels) before it's considered an area selection
@@ -19,12 +30,71 @@ export function IframeRenderer({
     viewport,
     mode,
     onCommentClick,
-    highlightedComment
+    highlightedComment,
+    children,
+    onScrollChange
 }: IframeRendererProps) {
     const overlayRef = useRef<HTMLDivElement>(null)
+    const iframeRef = useRef<HTMLIFrameElement>(null)
     const [isDragging, setIsDragging] = useState(false)
     const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null)
     const [dragCurrent, setDragCurrent] = useState<{ x: number; y: number } | null>(null)
+
+    // Track iframe scroll position via postMessage from injected script
+    const [iframeScroll, setIframeScroll] = useState<ScrollState>({
+        scrollY: 0,
+        scrollX: 0,
+        documentHeight: 0,
+        documentWidth: 0,
+        viewportHeight: 0,
+        viewportWidth: 0
+    })
+
+    // Listen for scroll messages from the iframe
+    useEffect(() => {
+        function handleMessage(event: MessageEvent) {
+            if (event.data?.type === 'FEEDBACK_SCROLL') {
+                const newScroll: ScrollState = {
+                    scrollY: event.data.scrollY ?? 0,
+                    scrollX: event.data.scrollX ?? 0,
+                    documentHeight: event.data.documentHeight ?? 0,
+                    documentWidth: event.data.documentWidth ?? 0,
+                    viewportHeight: event.data.viewportHeight ?? 0,
+                    viewportWidth: event.data.viewportWidth ?? 0
+                }
+                console.log('[IframeRenderer] Received scroll:', newScroll)
+                setIframeScroll(newScroll)
+                onScrollChange?.(newScroll)
+            }
+        }
+
+        window.addEventListener('message', handleMessage)
+        return () => window.removeEventListener('message', handleMessage)
+    }, [onScrollChange])
+
+    // Function to scroll iframe to specific position (for jump-to-comment)
+    const scrollIframeTo = useCallback((scrollY: number, scrollX: number = 0, smooth: boolean = true) => {
+        iframeRef.current?.contentWindow?.postMessage({
+            type: 'FEEDBACK_SCROLL_TO',
+            scrollY,
+            scrollX,
+            smooth
+        }, '*')
+    }, [])
+
+    // Forward wheel events from overlay to iframe
+    const handleWheel = useCallback((e: React.WheelEvent) => {
+        const hasIframe = !!iframeRef.current?.contentWindow
+        console.log('[IframeRenderer] Wheel event, deltaY:', e.deltaY, 'iframeReady:', hasIframe)
+        // Send scroll delta to iframe via postMessage
+        if (hasIframe) {
+            iframeRef.current!.contentWindow!.postMessage({
+                type: 'FEEDBACK_SCROLL_BY',
+                deltaY: e.deltaY,
+                deltaX: e.deltaX
+            }, '*')
+        }
+    }, [])
 
     // Convert client coords to percentage coords
     const toPercentage = useCallback((clientX: number, clientY: number) => {
@@ -67,15 +137,15 @@ export function IframeRenderer({
         const distance = Math.sqrt(Math.pow(endPx.x - startPx.x, 2) + Math.pow(endPx.y - startPx.y, 2))
 
         if (distance < MIN_DRAG_DISTANCE) {
-            // Simple click - point comment
-            onCommentClick(dragStart.x, dragStart.y)
+            // Simple click - point comment with scroll position
+            onCommentClick(dragStart.x, dragStart.y, undefined, undefined, iframeScroll.scrollY, iframeScroll.scrollX)
         } else {
-            // Drag - area comment
+            // Drag - area comment with scroll position
             const x = Math.min(dragStart.x, dragCurrent.x)
             const y = Math.min(dragStart.y, dragCurrent.y)
             const width = Math.abs(dragCurrent.x - dragStart.x)
             const height = Math.abs(dragCurrent.y - dragStart.y)
-            onCommentClick(x, y, width, height)
+            onCommentClick(x, y, width, height, iframeScroll.scrollY, iframeScroll.scrollX)
         }
 
         setIsDragging(false)
@@ -113,6 +183,7 @@ export function IframeRenderer({
                             setDragCurrent(null)
                         }
                     }}
+                    onWheel={handleWheel}
                 />
             )}
 
@@ -145,6 +216,9 @@ export function IframeRenderer({
                     }}
                 />
             )}
+
+            {/* Comment pins - only in comment mode */}
+            {mode === "comment" && children}
         </>
     )
 
@@ -154,6 +228,7 @@ export function IframeRenderer({
             <div className="absolute inset-0 bg-white">
                 {renderOverlay()}
                 <iframe
+                    ref={iframeRef}
                     src={url}
                     className="h-full w-full bg-white"
                     title="Preview"
@@ -164,8 +239,8 @@ export function IframeRenderer({
     }
 
     // Tablet/Mobile modes show device frame
-    const width = viewport === "tablet" ? "768px" : "375px"
-    const height = viewport === "tablet" ? "1024px" : "667px"
+    const frameWidth = viewport === "tablet" ? "768px" : "375px"
+    const frameHeight = viewport === "tablet" ? "1024px" : "667px"
 
     return (
         <div className="absolute inset-0 overflow-auto bg-muted/30 flex items-start justify-center p-8">
@@ -175,10 +250,11 @@ export function IframeRenderer({
                     viewport === "mobile" && "rounded-3xl border-gray-800 border-[10px]",
                     viewport === "tablet" && "rounded-lg border-gray-300 border-4"
                 )}
-                style={{ width, height, flexShrink: 0 }}
+                style={{ width: frameWidth, height: frameHeight, flexShrink: 0 }}
             >
                 {renderOverlay()}
                 <iframe
+                    ref={iframeRef}
                     src={url}
                     className="h-full w-full bg-white rounded-inherit"
                     title="Preview"

@@ -34,6 +34,90 @@ export async function GET(request: NextRequest) {
         const baseTag = `<base href="${urlObj.origin}/">`
         html = html.replace("<head>", `<head>${baseTag}`)
 
+        // Inject scroll tracking script for comment anchoring
+        // This script reports scroll position to the parent window via postMessage
+        const scrollScript = `
+<script>
+(function() {
+    console.log('[Feedback Iframe] Script loaded');
+    var ticking = false;
+
+    function sendScrollPosition() {
+        var scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+        var scrollX = window.scrollX || document.documentElement.scrollLeft || 0;
+        var docHeight = Math.max(
+            document.body ? document.body.scrollHeight : 0,
+            document.documentElement ? document.documentElement.scrollHeight : 0
+        );
+        var docWidth = Math.max(
+            document.body ? document.body.scrollWidth : 0,
+            document.documentElement ? document.documentElement.scrollWidth : 0
+        );
+
+        console.log('[Feedback Iframe] Sending scroll position:', scrollY);
+        window.parent.postMessage({
+            type: 'FEEDBACK_SCROLL',
+            scrollY: scrollY,
+            scrollX: scrollX,
+            documentHeight: docHeight,
+            documentWidth: docWidth,
+            viewportHeight: window.innerHeight,
+            viewportWidth: window.innerWidth
+        }, '*');
+    }
+
+    // Send initial position on load
+    if (document.readyState === 'complete') {
+        sendScrollPosition();
+    } else {
+        window.addEventListener('load', sendScrollPosition);
+    }
+
+    // Throttled scroll listener using requestAnimationFrame
+    window.addEventListener('scroll', function() {
+        if (!ticking) {
+            window.requestAnimationFrame(function() {
+                sendScrollPosition();
+                ticking = false;
+            });
+            ticking = true;
+        }
+    }, { passive: true });
+
+    // Listen for scroll commands from parent
+    window.addEventListener('message', function(event) {
+        if (!event.data) return;
+
+        // Jump-to-comment: scroll to absolute position
+        if (event.data.type === 'FEEDBACK_SCROLL_TO') {
+            console.log('[Feedback Iframe] Received SCROLL_TO:', event.data.scrollY);
+            window.scrollTo({
+                top: event.data.scrollY || 0,
+                left: event.data.scrollX || 0,
+                behavior: event.data.smooth ? 'smooth' : 'auto'
+            });
+        }
+
+        // Forwarded wheel event: scroll by delta
+        if (event.data.type === 'FEEDBACK_SCROLL_BY') {
+            console.log('[Feedback Iframe] Received SCROLL_BY:', event.data.deltaY);
+            window.scrollBy({
+                top: event.data.deltaY || 0,
+                left: event.data.deltaX || 0
+            });
+        }
+    });
+})();
+</script>
+`
+
+        // Inject before </body> or at end of document
+        if (html.includes('</body>')) {
+            html = html.replace('</body>', `${scrollScript}</body>`)
+        } else {
+            html += scrollScript
+        }
+
         // Remove X-Frame-Options and CSP headers from the response itself
         // Note: We are constructing a NEW response, so original headers are discarded unless we copy them.
         // We specifically WANT to discard X-Frame-Options and Content-Security-Policy.

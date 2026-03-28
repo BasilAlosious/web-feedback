@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Maximize, Minimize } from "lucide-react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
-import { IframeRenderer } from "@/components/markup/IframeRenderer"
+import { IframeRenderer, ScrollState } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
 import { Markup, Comment } from "@/lib/db"
 import Link from "next/link"
@@ -30,9 +30,17 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
 
     // Comment state
     const [comments, setComments] = useState<Comment[]>(initialComments)
-    const [newComment, setNewComment] = useState<{ x: number, y: number } | null>(null)
+    const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number; scrollY?: number; scrollX?: number } | null>(null)
     const [showThread, setShowThread] = useState(true)
     const [showShare, setShowShare] = useState(false)
+
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    // Track iframe scroll position for anchoring comment pins to content
+    const [scrollState, setScrollState] = useState({ scrollY: 0, scrollX: 0 })
+    const handleScrollChange = useCallback((scroll: ScrollState) => {
+        setScrollState({ scrollY: scroll.scrollY, scrollX: scroll.scrollX })
+    }, [])
 
     // In-app fullscreen (hides all panels, stays within browser window)
     const [isFullscreen, setIsFullscreen] = useState(false)
@@ -52,9 +60,9 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
         localStorage.setItem('feedback_guest_name', name)
     }
 
-    const handleCanvasClick = (x: number, y: number) => {
+    const handleCanvasClick = (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number) => {
         if (mode === "comment") {
-            setNewComment({ x, y })
+            setNewComment({ x, y, width, height, scrollY, scrollX })
         }
     }
 
@@ -68,6 +76,10 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             markupId: markup.id,
             x: newComment.x,
             y: newComment.y,
+            width: newComment.width,
+            height: newComment.height,
+            scrollY: newComment.scrollY,
+            scrollX: newComment.scrollX,
             content,
             author: authorName,
             createdAt: new Date().toISOString(),
@@ -81,7 +93,19 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
         setShowThread(true)
 
         try {
-            const saved = await addComment(markup.id, content, newComment.x, newComment.y, authorName, priority, undefined, undefined, isGuest)
+            const saved = await addComment(
+                markup.id,
+                content,
+                newComment.x,
+                newComment.y,
+                authorName,
+                priority,
+                newComment.width,
+                newComment.height,
+                isGuest,
+                newComment.scrollY,
+                newComment.scrollX
+            )
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch (error) {
             console.error("Failed to save comment", error)
@@ -160,7 +184,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                     </div>
 
                     {/* Preview Content Area */}
-                    <div className="relative flex-1 overflow-hidden">
+                    <div ref={containerRef} className="relative flex-1 overflow-hidden">
                         {/* Fullscreen floating button */}
                         <button
                             onClick={handleFullscreen}
@@ -178,50 +202,98 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                             }
                         </button>
 
-                        {/* Comments Layer */}
-                        <div className="absolute inset-0 z-20 pointer-events-none">
-                            {comments.map((comment, i) => (
-                                <div key={comment.id} className="pointer-events-auto">
-                                    <CommentPin
-                                        x={comment.x}
-                                        y={comment.y}
-                                        number={i + 1}
-                                        author={comment.author}
-                                        content={comment.content}
-                                        priority={comment.priority}
-                                        onClick={() => setShowThread(true)}
-                                    />
-                                </div>
-                            ))}
-
-                            {newComment && (
-                                <div className="pointer-events-auto">
-                                    <CommentPin
-                                        x={newComment.x}
-                                        y={newComment.y}
-                                        number={comments.length + 1}
-                                        isNew
-                                        onSave={handleSaveComment}
-                                        onCancel={() => setNewComment(null)}
-                                    />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Renderer */}
+                        {/* Renderer with comments inside */}
                         {markup.type === "image" ? (
                             <CanvasRenderer
                                 imageUrl={markup.url || fallbackImage}
                                 mode={mode}
                                 onCommentClick={handleCanvasClick}
-                            />
+                            >
+                                {/* Comments - only visible in comment mode */}
+                                {mode === "comment" && (
+                                    <div className="absolute inset-0 z-20 pointer-events-none">
+                                        {comments.map((comment, i) => (
+                                            <div key={comment.id} className="pointer-events-auto">
+                                                <CommentPin
+                                                    x={comment.x}
+                                                    y={comment.y}
+                                                    number={i + 1}
+                                                    author={comment.author}
+                                                    content={comment.content}
+                                                    priority={comment.priority}
+                                                    onClick={() => setShowThread(true)}
+                                                />
+                                            </div>
+                                        ))}
+
+                                        {newComment && (
+                                            <div className="pointer-events-auto">
+                                                <CommentPin
+                                                    x={newComment.x}
+                                                    y={newComment.y}
+                                                    number={comments.length + 1}
+                                                    isNew
+                                                    onSave={handleSaveComment}
+                                                    onCancel={() => setNewComment(null)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </CanvasRenderer>
                         ) : (
                             <IframeRenderer
                                 url={`/api/proxy?url=${encodeURIComponent(markup.url)}`}
                                 viewport={viewport}
                                 mode={mode}
                                 onCommentClick={handleCanvasClick}
-                            />
+                                onScrollChange={handleScrollChange}
+                            >
+                                {/* Comments - only visible in comment mode, anchored to content */}
+                                {mode === "comment" && (
+                                    <div className="absolute inset-0 z-20 pointer-events-none">
+                                        {comments.map((comment, i) => {
+                                            // Anchor pins to content by adjusting for scroll delta
+                                            const h = containerRef.current?.clientHeight || 1
+                                            const w = containerRef.current?.clientWidth || 1
+                                            const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
+                                            const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
+                                            const adjustedY = comment.y - dy
+                                            const adjustedX = comment.x - dx
+
+                                            // Hide if scrolled out of view
+                                            if (adjustedY < -5 || adjustedY > 105) return null
+
+                                            return (
+                                                <div key={comment.id} className="pointer-events-auto">
+                                                    <CommentPin
+                                                        x={adjustedX}
+                                                        y={adjustedY}
+                                                        number={i + 1}
+                                                        author={comment.author}
+                                                        content={comment.content}
+                                                        priority={comment.priority}
+                                                        onClick={() => setShowThread(true)}
+                                                    />
+                                                </div>
+                                            )
+                                        })}
+
+                                        {newComment && (
+                                            <div className="pointer-events-auto">
+                                                <CommentPin
+                                                    x={newComment.x}
+                                                    y={newComment.y}
+                                                    number={comments.length + 1}
+                                                    isNew
+                                                    onSave={handleSaveComment}
+                                                    onCancel={() => setNewComment(null)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </IframeRenderer>
                         )}
                     </div>
                 </div>
@@ -240,7 +312,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             </div>
 
             {/* Comment Thread Panel with Guest Name Header */}
-            {showThread && !isFullscreen && (
+            {showThread && !isFullscreen && mode === "comment" && (
                 <div className="flex flex-col h-full">
                     {/* Guest Name Input Banner */}
                     {isGuest && (
