@@ -84,9 +84,9 @@ export function IframeRenderer({
 
     // Forward wheel events from overlay to iframe
     const handleWheel = useCallback((e: React.WheelEvent) => {
+        // Prevent outer containers from scrolling — only the iframe should scroll
+        e.stopPropagation()
         const hasIframe = !!iframeRef.current?.contentWindow
-        console.log('[IframeRenderer] Wheel event, deltaY:', e.deltaY, 'iframeReady:', hasIframe)
-        // Send scroll delta to iframe via postMessage
         if (hasIframe) {
             iframeRef.current!.contentWindow!.postMessage({
                 type: 'FEEDBACK_SCROLL_BY',

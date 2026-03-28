@@ -284,7 +284,7 @@ export function ProjectClient({
                 style={{
                     gridTemplateColumns: isFullscreen
                         ? "1fr"
-                        : showComments && selectedMarkup
+                        : showComments && selectedMarkup && mode === "comment"
                             ? "260px 1fr 320px"
                             : "260px 1fr"
                 }}
@@ -633,7 +633,8 @@ export function ProjectClient({
                                     height: `${100 / (zoomLevel / 100)}%`,
                                 }}
                             >
-                            {/* Comment pins — filtered */}
+                            {/* Comment pins — only visible in comment mode */}
+                            {mode === "comment" && (
                             <div className="absolute inset-0 z-20 pointer-events-none">
                                 {visibleComments.map((comment, i) => (
                                     <div key={comment.id} className="pointer-events-auto">
@@ -665,6 +666,7 @@ export function ProjectClient({
                                     </div>
                                 )}
                             </div>
+                            )}
 
                             {/* Renderer */}
                             {selectedMarkup.type === "image" ? (
@@ -719,8 +721,8 @@ export function ProjectClient({
                 </div>
             </section>
 
-            {/* RIGHT: Comments panel - hidden in fullscreen */}
-            {!isFullscreen && (
+            {/* RIGHT: Comments panel - hidden in fullscreen and browse mode */}
+            {!isFullscreen && mode === "comment" && (
                 selectedMarkup && showComments ? (
                     <CommentThread
                         markupId={selectedMarkup.id}
