@@ -618,7 +618,7 @@ export function ProjectClient({
 
                         {/* Dot-grid canvas */}
                         <div
-                            className="relative flex-1 overflow-auto"
+                            className={`relative flex-1 ${mode === "comment" ? "overflow-hidden" : "overflow-auto"}`}
                             style={{
                                 backgroundImage: "radial-gradient(#D0D0D0 1px, transparent 1px)",
                                 backgroundSize: "20px 20px",
