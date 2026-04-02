@@ -1,6 +1,22 @@
 {
   "projects": [
     {
+      "id": "01k1hs",
+      "userId": "0oqgtf4",
+      "name": "Watchit AI",
+      "url": "https://watchit-ai-staging.webflow.io/",
+      "markupCount": 1,
+      "updatedAt": "2026-03-28T09:07:08.422Z"
+    },
+    {
+      "id": "0lw3k7",
+      "userId": "auuy48j",
+      "name": "basenine",
+      "url": "https://basenine.co",
+      "markupCount": 1,
+      "updatedAt": "2026-03-25T11:31:40.203Z"
+    },
+    {
       "id": "n2akc",
       "userId": "auuy48j",
       "name": "Frankly",
@@ -27,6 +43,24 @@
   ],
   "markups": [
     {
+      "id": "ptwbrf",
+      "projectId": "01k1hs",
+      "name": "Homepage",
+      "url": "https://watchit-ai-staging.webflow.io/",
+      "viewport": "desktop",
+      "commentCount": 2,
+      "type": "website"
+    },
+    {
+      "id": "dm9trg",
+      "projectId": "0lw3k7",
+      "name": "homepage",
+      "url": "https://basenine.co",
+      "viewport": "desktop",
+      "commentCount": 2,
+      "type": "website"
+    },
+    {
       "id": "r3c5l6",
       "projectId": "n2akc",
       "name": "Homepage",
@@ -41,7 +75,7 @@
       "name": "Case Study - Shikenso",
       "url": "https://www.basenine.co/case-study/shikenso",
       "viewport": "desktop",
-      "commentCount": 3,
+      "commentCount": 6,
       "type": "website"
     },
     {
@@ -118,7 +152,7 @@
       "content": "Change these images",
       "author": "Agency User",
       "createdAt": "2026-02-24T12:20:01.032Z",
-      "status": "open"
+      "status": "in_progress"
     },
     {
       "id": "wo20q",
@@ -140,7 +174,7 @@
       "author": "Agency User",
       "createdAt": "2026-03-21T17:26:05.796Z",
       "priority": "high",
-      "status": "open"
+      "status": "in_progress"
     },
     {
       "id": "p6evsw",
@@ -186,6 +220,93 @@
       "createdAt": "2026-03-25T09:34:48.636Z",
       "status": "open",
       "isGuest": true
+    },
+    {
+      "id": "7iy0rg",
+      "markupId": "dm9trg",
+      "x": 17.87584143605086,
+      "y": 34.294871794871796,
+      "content": "change this logo",
+      "author": "basil",
+      "createdAt": "2026-03-25T11:32:09.734Z",
+      "status": "open",
+      "isGuest": false
+    },
+    {
+      "id": "t3hvq5",
+      "markupId": "dm9trg",
+      "x": 50,
+      "y": 50,
+      "scrollY": 200,
+      "scrollX": 0,
+      "content": "Test comment at scroll 200",
+      "author": "Guest",
+      "createdAt": "2026-03-25T12:25:52.638Z",
+      "status": "open",
+      "isGuest": true
+    },
+    {
+      "id": "vti31r",
+      "markupId": "hdvs9e",
+      "x": 42.76119402985075,
+      "y": 78.03680981595093,
+      "content": "testll",
+      "author": "Basil",
+      "createdAt": "2026-03-25T12:42:15.817Z",
+      "status": "open",
+      "isGuest": false
+    },
+    {
+      "id": "5fyd1",
+      "markupId": "hdvs9e",
+      "x": 21.162280701754383,
+      "y": 81.1088295687885,
+      "scrollY": 0,
+      "scrollX": 0,
+      "content": "tesr",
+      "author": "Basil",
+      "createdAt": "2026-03-28T08:28:10.284Z",
+      "status": "open",
+      "isGuest": false
+    },
+    {
+      "id": "zzr924",
+      "markupId": "hdvs9e",
+      "x": 50.10964912280702,
+      "y": 45.790554414784395,
+      "scrollY": 2065,
+      "scrollX": 0,
+      "content": "change the cross here.",
+      "author": "Basil",
+      "createdAt": "2026-03-28T08:37:11.941Z",
+      "status": "open",
+      "isGuest": false
+    },
+    {
+      "id": "q4gtz",
+      "markupId": "ptwbrf",
+      "x": 49.92012779552716,
+      "y": 44.005847953216374,
+      "scrollY": 709,
+      "scrollX": 0,
+      "content": "animation would be added soon.",
+      "author": "dan",
+      "createdAt": "2026-03-28T09:07:49.846Z",
+      "status": "open",
+      "isGuest": false
+    },
+    {
+      "id": "nfoql",
+      "markupId": "ptwbrf",
+      "x": 45.92274678111588,
+      "y": 63.450292397660824,
+      "scrollY": 1803,
+      "scrollX": 0,
+      "content": "this is going to be a video",
+      "author": "dan",
+      "createdAt": "2026-03-28T09:08:11.886Z",
+      "status": "open",
+      "isGuest": false
     }
   ],
   "users": [
@@ -202,6 +323,13 @@
       "name": "basil",
       "passwordHash": "$2b$10$1Mw./rkbRgwoR06Vam6ek.9C/mE7BDyfUDUYboCz3ZOJ237sxLzPS",
       "createdAt": "2026-03-25T09:27:08.467Z"
+    },
+    {
+      "id": "0oqgtf4",
+      "email": "alosiousbasil@gmail.com",
+      "name": "dan",
+      "passwordHash": "$2b$10$M.2R7lFltUXJsPkDflOej.7NDtgg3hAS.WssmC2a4mP3JmbfpWnly",
+      "createdAt": "2026-03-28T09:06:50.437Z"
     }
   ]
 }
