@@ -3,10 +3,13 @@
   "configurations": [
     {
       "name": "Next.js Dev",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "/Users/basilalosious/.nvm/versions/node/v23.11.0/bin/node",
+      "runtimeArgs": ["node_modules/.bin/next", "dev"],
       "port": 3000,
-      "autoPort": true
+      "autoPort": true,
+      "env": {
+        "PATH": "/Users/basilalosious/.nvm/versions/node/v23.11.0/bin:/usr/local/bin:/usr/bin:/bin"
+      }
     }
   ]
 }
