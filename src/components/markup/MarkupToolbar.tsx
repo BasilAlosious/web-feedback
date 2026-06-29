@@ -1,13 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { Monitor, Tablet, Smartphone } from "lucide-react"
+import { DEVICE_PRESETS, DEFAULT_DEVICE, PRESETS_BY_CATEGORY, type DeviceKey } from "@/components/markup/IframeRenderer"
 
 interface MarkupToolbarProps {
     projectId: string
     projectName: string
-    viewport: "desktop" | "tablet" | "mobile"
-    onViewportChange: (viewport: "desktop" | "tablet" | "mobile") => void
+    device: DeviceKey
+    onDeviceChange: (device: DeviceKey) => void
     mode: "browse" | "comment"
     onModeChange: (mode: "browse" | "comment") => void
     onToggleThread?: () => void
@@ -19,8 +19,8 @@ interface MarkupToolbarProps {
 export function MarkupToolbar({
     projectId,
     projectName,
-    viewport,
-    onViewportChange,
+    device,
+    onDeviceChange,
     mode,
     onModeChange,
     onToggleThread,
@@ -28,6 +28,7 @@ export function MarkupToolbar({
     onShare,
     commentCount = 0,
 }: MarkupToolbarProps) {
+    const category = DEVICE_PRESETS[device].category
     return (
         <div className="flex items-center justify-between border-b border-border bg-background px-4 h-10 flex-shrink-0">
             {/* Left: Back & Title */}
@@ -45,30 +46,31 @@ export function MarkupToolbar({
 
             {/* Center: Viewport & Mode Controls */}
             <div className="flex items-center gap-6">
-                {/* Viewport */}
+                {/* Device — category tabs + preset selector */}
                 <div className="flex items-center gap-2">
                     <span className="slash-label mr-2">Device</span>
-                    <button
-                        onClick={() => onViewportChange("desktop")}
-                        className={`nav-item flex items-center gap-1 ${viewport === "desktop" ? "text-foreground" : ""}`}
+                    {(["desktop", "tablet", "mobile"] as const).map((cat) => (
+                        <button
+                            key={cat}
+                            onClick={() => onDeviceChange(DEFAULT_DEVICE[cat])}
+                            className={`nav-item ${category === cat ? "text-foreground" : ""}`}
+                        >
+                            <span className="text-foreground">[{cat === "desktop" ? "D" : cat === "tablet" ? "T" : "M"}]</span>
+                        </button>
+                    ))}
+                    <select
+                        value={device}
+                        onChange={(e) => onDeviceChange(e.target.value as DeviceKey)}
+                        className="ml-1 border border-border bg-background font-mono text-[11px] outline-none cursor-pointer"
+                        style={{ padding: "1px 4px" }}
+                        title="Device preset — comments are scoped to the selected preset"
                     >
-                        <Monitor className="h-3 w-3" />
-                        <span className="text-foreground">[D]</span>
-                    </button>
-                    <button
-                        onClick={() => onViewportChange("tablet")}
-                        className={`nav-item flex items-center gap-1 ${viewport === "tablet" ? "text-foreground" : ""}`}
-                    >
-                        <Tablet className="h-3 w-3" />
-                        <span className="text-foreground">[T]</span>
-                    </button>
-                    <button
-                        onClick={() => onViewportChange("mobile")}
-                        className={`nav-item flex items-center gap-1 ${viewport === "mobile" ? "text-foreground" : ""}`}
-                    >
-                        <Smartphone className="h-3 w-3" />
-                        <span className="text-foreground">[M]</span>
-                    </button>
+                        {PRESETS_BY_CATEGORY[category].map((key) => (
+                            <option key={key} value={key}>
+                                {DEVICE_PRESETS[key].label} ({DEVICE_PRESETS[key].w}×{DEVICE_PRESETS[key].h})
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* Mode - Prominent toggle for guests */}

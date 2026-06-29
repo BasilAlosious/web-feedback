@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Maximize, Minimize } from "lucide-react"
 import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
-import { IframeRenderer, ScrollState } from "@/components/markup/IframeRenderer"
+import { IframeRenderer, ScrollState, IframeRendererHandle, DEVICE_PRESETS, DEFAULT_DEVICE, type DeviceKey } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
+import { CustomScrollbar } from "@/components/markup/CustomScrollbar"
 import { Markup, Comment } from "@/lib/db"
 import Link from "next/link"
 import { CommentPin } from "@/components/comments/CommentPin"
@@ -23,7 +24,8 @@ interface MarkupClientProps {
 
 export function MarkupClient({ markupId, projectId, initialData, initialComments, isGuest = false }: MarkupClientProps) {
     const user = useUser()
-    const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop")
+    const [device, setDevice] = useState<DeviceKey>("desktop-1440")
+    const viewport = DEVICE_PRESETS[device].category
     const [mode, setMode] = useState<"browse" | "comment">("comment")
     const [useProxy] = useState(true)
     const [markup] = useState<Markup | undefined>(initialData)
@@ -36,10 +38,35 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
 
     const containerRef = useRef<HTMLDivElement>(null)
 
+    // Measure the container width so the fixed-size frame can be scaled to fit.
+    const [canvasWidth, setCanvasWidth] = useState(0)
+    useEffect(() => {
+        const el = containerRef.current
+        if (!el) return
+        const update = () => setCanvasWidth(el.clientWidth)
+        update()
+        const ro = new ResizeObserver(update)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [])
+
+    // Desktop width is the saved per-page render width so pins align across viewers.
+    const frameSize = { w: DEVICE_PRESETS[device].w, h: DEVICE_PRESETS[device].h }
+    const fitScale = canvasWidth > 0 ? Math.min(1, canvasWidth / frameSize.w) : 1
+
+    // Imperative handle to drive iframe scroll from the custom scrollbar.
+    const iframeHandleRef = useRef<IframeRendererHandle>(null)
+
     // Track iframe scroll for anchoring pins to content
-    const [scrollState, setScrollState] = useState({ scrollY: 0, scrollX: 0 })
+    const [scrollState, setScrollState] = useState({ scrollY: 0, scrollX: 0, viewportHeight: 0, viewportWidth: 0, documentHeight: 0 })
     const handleScrollChange = useCallback((scroll: ScrollState) => {
-        setScrollState({ scrollY: scroll.scrollY, scrollX: scroll.scrollX })
+        setScrollState({
+            scrollY: scroll.scrollY,
+            scrollX: scroll.scrollX,
+            viewportHeight: scroll.viewportHeight,
+            viewportWidth: scroll.viewportWidth,
+            documentHeight: scroll.documentHeight,
+        })
     }, [])
 
     // In-app fullscreen (hides all panels, stays within browser window)
@@ -86,6 +113,8 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             priority,
             status: 'open',
             isGuest,
+            viewport,
+            device,
         }
 
         setComments(prev => [...prev, optimisticComment])
@@ -104,7 +133,9 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                 newComment.height,
                 isGuest,
                 newComment.scrollY,
-                newComment.scrollX
+                newComment.scrollX,
+                viewport,
+                device
             )
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch (error) {
@@ -164,8 +195,8 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                 {!isFullscreen && <MarkupToolbar
                     projectId={markup.projectId}
                     projectName={markup.name}
-                    viewport={viewport}
-                    onViewportChange={setViewport}
+                    device={device}
+                    onDeviceChange={(d) => { setDevice(d); setNewComment(null) }}
                     mode={mode}
                     onModeChange={setMode}
                     onToggleThread={() => setShowThread(!showThread)}
@@ -242,19 +273,38 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                                 )}
                             </CanvasRenderer>
                         ) : (
+                          <div className="min-h-full flex justify-center">
+                            <div
+                                style={{
+                                    width: `${frameSize.w * fitScale}px`,
+                                    height: `${frameSize.h * fitScale}px`,
+                                    flexShrink: 0,
+                                }}
+                            >
+                              <div
+                                className="relative origin-top-left transition-transform duration-200"
+                                style={{
+                                    width: `${frameSize.w}px`,
+                                    height: `${frameSize.h}px`,
+                                    transform: `scale(${fitScale})`,
+                                }}
+                              >
                             <IframeRenderer
+                                ref={iframeHandleRef}
                                 url={`/api/proxy?url=${encodeURIComponent(markup.url)}`}
                                 viewport={viewport}
                                 mode={mode}
+                                frameWidth={frameSize.w}
+                                frameHeight={frameSize.h}
                                 onCommentClick={handleCanvasClick}
                                 onScrollChange={handleScrollChange}
                             >
                                 {/* Comments - only visible in comment mode, anchored to content */}
                                 {mode === "comment" && (
                                     <div className="absolute inset-0 z-20 pointer-events-none">
-                                        {comments.map((comment, i) => {
-                                            const h = containerRef.current?.clientHeight || 1
-                                            const w = containerRef.current?.clientWidth || 1
+                                        {comments.filter(c => (c.device ?? DEFAULT_DEVICE[c.viewport ?? 'desktop']) === device).map((comment, i) => {
+                                            const h = scrollState.viewportHeight || containerRef.current?.clientHeight || 1
+                                            const w = scrollState.viewportWidth || containerRef.current?.clientWidth || 1
                                             const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
                                             const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
                                             const adjustedY = comment.y - dy
@@ -292,6 +342,16 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                                     </div>
                                 )}
                             </IframeRenderer>
+                              </div>
+                            </div>
+                            {/* Custom draggable scrollbar (canvas-level, unscaled) */}
+                            <CustomScrollbar
+                                scrollY={scrollState.scrollY}
+                                viewportHeight={scrollState.viewportHeight}
+                                documentHeight={scrollState.documentHeight}
+                                onScroll={(y) => iframeHandleRef.current?.scrollTo(y)}
+                            />
+                          </div>
                         )}
                     </div>
                 </div>

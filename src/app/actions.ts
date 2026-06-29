@@ -33,6 +33,7 @@ export async function createMarkup(prevState: any, formData: FormData) {
     const name = formData.get('name') as string
     const url = formData.get('url') as string
     const viewport = formData.get('viewport') as 'desktop' | 'tablet' | 'mobile' || 'desktop'
+    const figmaUrl = formData.get('figmaUrl') as string | null
 
     if (!projectId || !name || !url) return { error: 'Missing fields' }
 
@@ -44,11 +45,19 @@ export async function createMarkup(prevState: any, formData: FormData) {
         viewport,
         commentCount: 0,
         type,
+        figmaUrl: figmaUrl || undefined,
     }
 
     await db.addMarkup(newMarkup)
     revalidatePath(`/projects/${projectId}`)
     return { success: true }
+}
+
+export async function updateMarkupFigmaUrl(markupId: string, figmaUrl: string | null) {
+    const markup = await db.getMarkup(markupId)
+    if (!markup) throw new Error('Markup not found')
+    await db.updateMarkup(markupId, { figmaUrl: figmaUrl ?? undefined })
+    revalidatePath(`/projects/${markup.projectId}`)
 }
 
 export async function getComments(markupId: string): Promise<Comment[]> {
@@ -66,7 +75,9 @@ export async function addComment(
     height?: number,
     isGuest?: boolean,
     scrollY?: number,
-    scrollX?: number
+    scrollX?: number,
+    viewport: 'desktop' | 'tablet' | 'mobile' = 'desktop',
+    device?: string
 ) {
     const newComment: Comment = {
         id: Math.random().toString(36).substring(7),
@@ -83,10 +94,22 @@ export async function addComment(
         priority,
         status: 'open',
         isGuest,
+        viewport,
+        device,
     }
 
     await db.addComment(newComment)
     return newComment
+}
+
+export async function updateCommentPosition(
+    commentId: string,
+    x: number,
+    y: number,
+    scrollY: number = 0,
+    scrollX: number = 0
+) {
+    return db.updateComment(commentId, { x, y, scrollY, scrollX })
 }
 
 export async function renameMarkup(markupId: string, name: string) {

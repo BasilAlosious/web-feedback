@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 
 type Priority = 'high' | 'medium' | 'low'
@@ -24,6 +24,8 @@ const PRIORITY_COLOR: Record<Priority, string> = {
     low: '#9CA3AF',
 }
 
+const DRAG_THRESHOLD = 4 // pixels before treating as a drag vs. click
+
 interface CommentPinProps {
     x: number
     y: number
@@ -38,15 +40,25 @@ interface CommentPinProps {
     onSave?: (content: string, priority?: Priority) => void
     onCancel?: () => void
     onClick?: () => void
+    onMove?: (newX: number, newY: number) => void
 }
 
 export function CommentPin({
     x, y, width, height, number, author, content, priority,
-    isNew, isHighlighted, onSave, onCancel, onClick
+    isNew, isHighlighted, onSave, onCancel, onClick, onMove
 }: CommentPinProps) {
     const [inputValue, setInputValue] = useState("")
     const [selectedPriority, setSelectedPriority] = useState<Priority | undefined>(undefined)
     const [isExpanded, setIsExpanded] = useState(isNew)
+
+    // Drag-to-reposition state
+    const wrapperRef = useRef<HTMLDivElement>(null)
+    const [dragDelta, setDragDelta] = useState<{ dx: number; dy: number } | null>(null)
+    const dragStartRef = useRef<{
+        containerRect: DOMRect
+        pointerX: number
+        pointerY: number
+    } | null>(null)
 
     const handleSave = () => {
         if (!inputValue.trim()) return
@@ -66,8 +78,62 @@ export function CommentPin({
         setSelectedPriority(PRIORITY_CYCLE[current])
     }
 
+    const handlePinPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+        if (isNew) return
+        const container = wrapperRef.current?.parentElement
+        if (!container) return
+
+        e.preventDefault()
+        e.stopPropagation()
+        e.currentTarget.setPointerCapture(e.pointerId)
+
+        dragStartRef.current = {
+            containerRect: container.getBoundingClientRect(),
+            pointerX: e.clientX,
+            pointerY: e.clientY,
+        }
+        setDragDelta({ dx: 0, dy: 0 })
+    }
+
+    const handlePinPointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+        if (!dragStartRef.current || !onMove) return
+        const { containerRect, pointerX, pointerY } = dragStartRef.current
+        const deltaXPx = e.clientX - pointerX
+        const deltaYPx = e.clientY - pointerY
+        setDragDelta({
+            dx: (deltaXPx / containerRect.width) * 100,
+            dy: (deltaYPx / containerRect.height) * 100,
+        })
+    }
+
+    const handlePinPointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+        if (!dragStartRef.current) return
+        const { containerRect, pointerX, pointerY } = dragStartRef.current
+        const deltaXPx = e.clientX - pointerX
+        const deltaYPx = e.clientY - pointerY
+        const distance = Math.sqrt(deltaXPx * deltaXPx + deltaYPx * deltaYPx)
+
+        if (distance > DRAG_THRESHOLD && onMove) {
+            const newX = Math.max(0, Math.min(100, x + (deltaXPx / containerRect.width) * 100))
+            const newY = Math.max(0, Math.min(100, y + (deltaYPx / containerRect.height) * 100))
+            onMove(newX, newY)
+        } else {
+            // treat as click — toggle expanded card
+            if (!isNew) {
+                setIsExpanded(prev => !prev)
+                onClick?.()
+            }
+        }
+
+        dragStartRef.current = null
+        setDragDelta(null)
+    }
+
     const pinColor = priority ? PRIORITY_COLOR[priority] : undefined
     const hasArea = width && height && width > 0 && height > 0
+    const isDragging = dragDelta !== null && (Math.abs(dragDelta.dx) > 0.1 || Math.abs(dragDelta.dy) > 0.1)
+    const visualX = x + (dragDelta?.dx ?? 0)
+    const visualY = y + (dragDelta?.dy ?? 0)
 
     return (
         <>
@@ -95,29 +161,34 @@ export function CommentPin({
 
             {/* Pin marker container */}
             <div
+                ref={wrapperRef}
                 className="absolute z-50 transform -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${x}%`, top: `${y}%` }}
+                style={{
+                    left: `${visualX}%`,
+                    top: `${visualY}%`,
+                    cursor: isDragging ? 'grabbing' : (onMove ? 'grab' : 'pointer'),
+                    transition: isDragging ? 'none' : undefined,
+                }}
+                onMouseDown={e => e.stopPropagation()}
             >
                 {/* Pin Marker */}
                 <button
                     className={cn(
-                        "pin-marker transition-all duration-150 hover:scale-110",
+                        "pin-marker transition-all duration-150",
+                        !isDragging && "hover:scale-110",
                         isNew && "animate-pulse",
                         isHighlighted && "ring-4 ring-yellow-400 ring-opacity-75"
                     )}
                     style={pinColor ? { background: pinColor } : undefined}
-                    onClick={() => {
-                        if (!isNew) {
-                            setIsExpanded(!isExpanded)
-                            onClick?.()
-                        }
-                    }}
+                    onPointerDown={handlePinPointerDown}
+                    onPointerMove={handlePinPointerMove}
+                    onPointerUp={handlePinPointerUp}
                 >
                     {number}
                 </button>
 
                 {/* Existing comment card (click to expand) */}
-                {!isNew && isExpanded && (
+                {!isNew && isExpanded && !isDragging && (
                     <div className="absolute left-8 top-0 z-50 w-64 bg-background border border-border shadow-lg">
                         <div className="flex items-center justify-between px-3 py-2 border-b border-border">
                             <div className="flex items-center gap-2">

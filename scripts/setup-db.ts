@@ -81,6 +81,11 @@ async function main() {
     await client.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS scroll_y DOUBLE PRECISION`)
     await client.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS scroll_x DOUBLE PRECISION`)
 
+    // Migration: viewport + device per comment, figma_url per markup
+    await client.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS viewport TEXT NOT NULL DEFAULT 'desktop'`)
+    await client.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS device TEXT`)
+    await client.query(`ALTER TABLE markups ADD COLUMN IF NOT EXISTS figma_url TEXT`)
+
     console.log('Tables created.')
 
     // Seed from db.json

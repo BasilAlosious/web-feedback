@@ -21,6 +21,7 @@ export interface Markup {
     viewport: "desktop" | "tablet" | "mobile"
     commentCount: number
     type: "website" | "image"
+    figmaUrl?: string
 }
 
 export interface Comment {
@@ -38,6 +39,8 @@ export interface Comment {
     priority?: 'high' | 'medium' | 'low'
     status?: 'open' | 'in_progress' | 'resolved'
     isGuest?: boolean  // true for guest comments via share links
+    viewport: 'desktop' | 'tablet' | 'mobile'  // coarse category (for badge/back-compat)
+    device?: string  // exact device-preset key (e.g. 'desktop-1990'); scopes the comment
 }
 
 export interface User {
@@ -46,6 +49,20 @@ export interface User {
     name: string
     passwordHash: string
     createdAt: string
+}
+
+// Default device-preset key per coarse viewport — used to backfill legacy comments
+// that predate the `device` field. (Mirrors DEFAULT_DEVICE in IframeRenderer; kept
+// local to avoid importing a client module into the data layer.)
+const DEFAULT_DEVICE_BY_VIEWPORT: Record<string, string> = {
+    desktop: 'desktop-1440',
+    tablet: 'ipad',
+    mobile: 'iphone-16',
+}
+
+function withCommentDefaults(c: Comment): Comment {
+    const viewport = c.viewport ?? 'desktop'
+    return { ...c, viewport, device: c.device ?? DEFAULT_DEVICE_BY_VIEWPORT[viewport] ?? 'desktop-1440' }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -116,7 +133,9 @@ function jsonDb() {
         },
 
         getComments: async (markupId: string): Promise<Comment[]> =>
-            read().comments.filter(c => c.markupId === markupId),
+            read().comments
+                .filter(c => c.markupId === markupId)
+                .map(withCommentDefaults),
 
         addComment: async (c: Comment): Promise<Comment> => {
             const d = read(); d.comments.push(c)
@@ -133,7 +152,9 @@ function jsonDb() {
         getCommentsForProject: async (projectId: string): Promise<Comment[]> => {
             const d = read()
             const ids = new Set(d.markups.filter(m => m.projectId === projectId).map(m => m.id))
-            return d.comments.filter(c => ids.has(c.markupId))
+            return d.comments
+                .filter(c => ids.has(c.markupId))
+                .map(withCommentDefaults)
         },
 
         getCommentCountsForProjects: async (projectIds: string[]): Promise<Record<string, number>> => {
@@ -157,8 +178,8 @@ function postgresDb() {
 
     const SU = `id, email, name, password_hash AS "passwordHash", created_at AS "createdAt"`
     const SP = `id, user_id AS "userId", name, url, markup_count AS "markupCount", updated_at AS "updatedAt"`
-    const SM = `id, project_id AS "projectId", name, url, viewport, comment_count AS "commentCount", type`
-    const SC = `id, markup_id AS "markupId", x, y, width, height, scroll_y AS "scrollY", scroll_x AS "scrollX", content, author, created_at AS "createdAt", priority, status, is_guest AS "isGuest"`
+    const SM = `id, project_id AS "projectId", name, url, viewport, comment_count AS "commentCount", type, figma_url AS "figmaUrl"`
+    const SC = `id, markup_id AS "markupId", x, y, width, height, scroll_y AS "scrollY", scroll_x AS "scrollX", content, author, created_at AS "createdAt", priority, status, is_guest AS "isGuest", COALESCE(viewport, 'desktop') AS viewport, COALESCE(device, CASE COALESCE(viewport,'desktop') WHEN 'tablet' THEN 'ipad' WHEN 'mobile' THEN 'iphone-16' ELSE 'desktop-1440' END) AS device`
 
     return {
         // User methods
@@ -205,17 +226,18 @@ function postgresDb() {
         },
 
         addMarkup: async (m: Markup): Promise<Markup> => {
-            await sql`INSERT INTO markups (id, project_id, name, url, viewport, comment_count, type)
-                      VALUES (${m.id}, ${m.projectId}, ${m.name}, ${m.url}, ${m.viewport}, ${m.commentCount}, ${m.type})`
+            await sql`INSERT INTO markups (id, project_id, name, url, viewport, comment_count, type, figma_url)
+                      VALUES (${m.id}, ${m.projectId}, ${m.name}, ${m.url}, ${m.viewport}, ${m.commentCount}, ${m.type}, ${m.figmaUrl ?? null})`
             await sql`UPDATE projects SET markup_count = markup_count + 1 WHERE id = ${m.projectId}`
             return m
         },
 
         updateMarkup: async (id: string, patch: Partial<Markup>): Promise<Markup> => {
-            if (patch.name     !== undefined) await sql`UPDATE markups SET name     = ${patch.name}     WHERE id = ${id}`
-            if (patch.url      !== undefined) await sql`UPDATE markups SET url      = ${patch.url}      WHERE id = ${id}`
-            if (patch.viewport !== undefined) await sql`UPDATE markups SET viewport = ${patch.viewport} WHERE id = ${id}`
-            if (patch.type     !== undefined) await sql`UPDATE markups SET type     = ${patch.type}     WHERE id = ${id}`
+            if (patch.name     !== undefined) await sql`UPDATE markups SET name      = ${patch.name}            WHERE id = ${id}`
+            if (patch.url      !== undefined) await sql`UPDATE markups SET url       = ${patch.url}             WHERE id = ${id}`
+            if (patch.viewport !== undefined) await sql`UPDATE markups SET viewport  = ${patch.viewport}        WHERE id = ${id}`
+            if (patch.type     !== undefined) await sql`UPDATE markups SET type      = ${patch.type}            WHERE id = ${id}`
+            if (patch.figmaUrl !== undefined) await sql`UPDATE markups SET figma_url = ${patch.figmaUrl ?? null} WHERE id = ${id}`
             const { rows } = await sql.query(`SELECT ${SM} FROM markups WHERE id = $1`, [id])
             if (!rows[0]) throw new Error('Markup not found')
             return rows[0] as Markup
@@ -236,16 +258,21 @@ function postgresDb() {
         },
 
         addComment: async (c: Comment): Promise<Comment> => {
-            await sql`INSERT INTO comments (id, markup_id, x, y, width, height, scroll_y, scroll_x, content, author, created_at, priority, status, is_guest)
+            await sql`INSERT INTO comments (id, markup_id, x, y, width, height, scroll_y, scroll_x, content, author, created_at, priority, status, is_guest, viewport, device)
                       VALUES (${c.id}, ${c.markupId}, ${c.x}, ${c.y}, ${c.width ?? null}, ${c.height ?? null}, ${c.scrollY ?? null}, ${c.scrollX ?? null}, ${c.content}, ${c.author},
-                              ${c.createdAt}, ${c.priority ?? null}, ${c.status ?? 'open'}, ${c.isGuest ?? false})`
+                              ${c.createdAt}, ${c.priority ?? null}, ${c.status ?? 'open'}, ${c.isGuest ?? false}, ${c.viewport ?? 'desktop'}, ${c.device ?? null})`
             await sql`UPDATE markups SET comment_count = comment_count + 1 WHERE id = ${c.markupId}`
             return c
         },
 
         updateComment: async (id: string, patch: Partial<Comment>): Promise<Comment> => {
-            if (patch.status   !== undefined) await sql`UPDATE comments SET status   = ${patch.status}           WHERE id = ${id}`
-            if (patch.priority !== undefined) await sql`UPDATE comments SET priority = ${patch.priority ?? null} WHERE id = ${id}`
+            if (patch.status   !== undefined) await sql`UPDATE comments SET status   = ${patch.status}             WHERE id = ${id}`
+            if (patch.priority !== undefined) await sql`UPDATE comments SET priority = ${patch.priority ?? null}   WHERE id = ${id}`
+            if (patch.x        !== undefined) await sql`UPDATE comments SET x        = ${patch.x}                  WHERE id = ${id}`
+            if (patch.y        !== undefined) await sql`UPDATE comments SET y        = ${patch.y}                  WHERE id = ${id}`
+            if (patch.scrollY  !== undefined) await sql`UPDATE comments SET scroll_y = ${patch.scrollY ?? null}    WHERE id = ${id}`
+            if (patch.scrollX  !== undefined) await sql`UPDATE comments SET scroll_x = ${patch.scrollX ?? null}    WHERE id = ${id}`
+            if (patch.viewport !== undefined) await sql`UPDATE comments SET viewport = ${patch.viewport ?? 'desktop'} WHERE id = ${id}`
             const { rows } = await sql.query(`SELECT ${SC} FROM comments WHERE id = $1`, [id])
             if (!rows[0]) throw new Error('Comment not found')
             return rows[0] as Comment
@@ -254,7 +281,7 @@ function postgresDb() {
         getCommentsForProject: async (projectId: string): Promise<Comment[]> => {
             const { rows } = await sql.query(
                 `SELECT c.id, c.markup_id AS "markupId", c.x, c.y, c.width, c.height, c.scroll_y AS "scrollY", c.scroll_x AS "scrollX", c.content, c.author,
-                        c.created_at AS "createdAt", c.priority, c.status, c.is_guest AS "isGuest"
+                        c.created_at AS "createdAt", c.priority, c.status, c.is_guest AS "isGuest", COALESCE(c.viewport, 'desktop') AS viewport
                  FROM comments c
                  INNER JOIN markups m ON c.markup_id = m.id
                  WHERE m.project_id = $1

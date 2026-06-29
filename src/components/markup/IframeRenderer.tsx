@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect, ReactNode } from "react"
+import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef, ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 export interface ScrollState {
@@ -12,6 +12,11 @@ export interface ScrollState {
     viewportWidth: number
 }
 
+// Imperative handle so parents can drive the iframe's scroll (e.g. a custom scrollbar).
+export interface IframeRendererHandle {
+    scrollTo: (scrollY: number, scrollX?: number, smooth?: boolean) => void
+}
+
 interface IframeRendererProps {
     url: string
     viewport: "desktop" | "tablet" | "mobile"
@@ -20,20 +25,60 @@ interface IframeRendererProps {
     highlightedComment?: { x: number; y: number; width?: number; height?: number; scrollY?: number } | null
     children?: ReactNode  // Comment pins to render inside
     onScrollChange?: (scroll: ScrollState) => void  // Callback when iframe scrolls
+    // "frame": render at a fixed logical size per viewport (stable layout, pins stay anchored).
+    //          The parent is responsible for scaling/centering. This is the default.
+    // "fill":  iframe fills its parent at fluid width (used by the compare split view).
+    fit?: "frame" | "fill"
+    // Optional overrides for the fixed frame size (e.g. an editable desktop width).
+    frameWidth?: number
+    frameHeight?: number
+}
+
+// Curated device presets. Each has a FIXED logical width so the responsive site
+// renders identically every time — percentage-based pins stay anchored, and each
+// preset is its own commenting context (comments are scoped per preset).
+export const DEVICE_PRESETS = {
+    'desktop-1440': { label: 'Desktop · 1440', category: 'desktop', w: 1440, h: 900 },
+    'desktop-1990': { label: 'Desktop · 1990', category: 'desktop', w: 1990, h: 900 },
+    'ipad':         { label: 'iPad',           category: 'tablet',  w: 768,  h: 1024 },
+    'ipad-pro':     { label: 'iPad Pro',       category: 'tablet',  w: 1024, h: 1366 },
+    'iphone-17':    { label: 'iPhone 17',      category: 'mobile',  w: 402,  h: 874 },
+    'iphone-16':    { label: 'iPhone 16',      category: 'mobile',  w: 393,  h: 852 },
+    'galaxy-s20':   { label: 'Galaxy S20',     category: 'mobile',  w: 360,  h: 800 },
+} as const
+
+export type DeviceKey = keyof typeof DEVICE_PRESETS
+export type DeviceCategory = 'desktop' | 'tablet' | 'mobile'
+
+// Default preset for each coarse category (used by category tabs and legacy comments).
+export const DEFAULT_DEVICE: Record<DeviceCategory, DeviceKey> = {
+    desktop: 'desktop-1440',
+    tablet: 'ipad',
+    mobile: 'iphone-16',
+}
+
+// Presets grouped by category, in declaration order — for the preset selector UI.
+export const PRESETS_BY_CATEGORY: Record<DeviceCategory, DeviceKey[]> = {
+    desktop: ['desktop-1440', 'desktop-1990'],
+    tablet: ['ipad', 'ipad-pro'],
+    mobile: ['iphone-17', 'iphone-16', 'galaxy-s20'],
 }
 
 // Minimum drag distance (in pixels) before it's considered an area selection
 const MIN_DRAG_DISTANCE = 10
 
-export function IframeRenderer({
+export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererProps>(function IframeRenderer({
     url,
     viewport,
     mode,
     onCommentClick,
     highlightedComment,
     children,
-    onScrollChange
-}: IframeRendererProps) {
+    onScrollChange,
+    fit = "frame",
+    frameWidth,
+    frameHeight
+}: IframeRendererProps, ref) {
     const overlayRef = useRef<HTMLDivElement>(null)
     const iframeRef = useRef<HTMLIFrameElement>(null)
     const [isDragging, setIsDragging] = useState(false)
@@ -81,6 +126,11 @@ export function IframeRenderer({
             smooth
         }, '*')
     }, [])
+
+    // Expose scroll control to parent (used by the custom scrollbar).
+    useImperativeHandle(ref, () => ({
+        scrollTo: (scrollY: number, scrollX: number = 0, smooth: boolean = false) => scrollIframeTo(scrollY, scrollX, smooth),
+    }), [scrollIframeTo])
 
     // Forward wheel events from overlay to iframe
     const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -222,8 +272,8 @@ export function IframeRenderer({
         </>
     )
 
-    // Desktop mode fills entire container
-    if (viewport === "desktop") {
+    // "fill" mode: fluid width, fills the parent (used by the compare split view).
+    if (fit === "fill") {
         return (
             <div className="absolute inset-0 bg-white">
                 {renderOverlay()}
@@ -238,29 +288,29 @@ export function IframeRenderer({
         )
     }
 
-    // Tablet/Mobile modes show device frame
-    const frameWidth = viewport === "tablet" ? "768px" : "375px"
-    const frameHeight = viewport === "tablet" ? "1024px" : "667px"
+    // "frame" mode (default): render at a fixed logical size. A fixed width keeps the
+    // site's responsive layout stable regardless of browser size, so percentage pins
+    // stay anchored. The parent (ProjectClient) scales/centers this frame to fit.
+    const w = frameWidth ?? DEVICE_PRESETS[DEFAULT_DEVICE[viewport]].w
+    const h = frameHeight ?? DEVICE_PRESETS[DEFAULT_DEVICE[viewport]].h
 
     return (
-        <div className="absolute inset-0 overflow-auto bg-muted/30 flex items-start justify-center p-8">
-            <div
-                className={cn(
-                    "bg-background shadow-2xl transition-all duration-300 relative",
-                    viewport === "mobile" && "rounded-3xl border-gray-800 border-[10px]",
-                    viewport === "tablet" && "rounded-lg border-gray-300 border-4"
-                )}
-                style={{ width: frameWidth, height: frameHeight, flexShrink: 0 }}
-            >
-                {renderOverlay()}
-                <iframe
-                    ref={iframeRef}
-                    src={url}
-                    className="h-full w-full bg-white rounded-inherit"
-                    title="Preview"
-                    sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
-                />
-            </div>
+        <div
+            className={cn(
+                "bg-background shadow-2xl relative",
+                viewport === "mobile" && "rounded-3xl border-gray-800 border-[10px]",
+                viewport === "tablet" && "rounded-lg border-gray-300 border-4"
+            )}
+            style={{ width: `${w}px`, height: `${h}px`, flexShrink: 0 }}
+        >
+            {renderOverlay()}
+            <iframe
+                ref={iframeRef}
+                src={url}
+                className="h-full w-full bg-white rounded-inherit"
+                title="Preview"
+                sandbox="allow-same-origin allow-scripts allow-popups allow-forms"
+            />
         </div>
     )
-}
+})

@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
 import { Markup, Comment, Project } from "@/lib/db"
-import { IframeRenderer, ScrollState } from "@/components/markup/IframeRenderer"
+import { IframeRenderer, ScrollState, IframeRendererHandle, DEVICE_PRESETS, DEFAULT_DEVICE, PRESETS_BY_CATEGORY, type DeviceKey } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
+import { CustomScrollbar } from "@/components/markup/CustomScrollbar"
+import { CompareSlider } from "@/components/markup/CompareSlider"
 import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
 import { CreateMarkupDialog } from "@/components/project/CreateMarkupDialog"
@@ -17,7 +19,10 @@ import {
     deleteMarkup,
     updateCommentStatus,
     updateCommentPriority,
+    updateCommentPosition,
+    updateMarkupFigmaUrl,
 } from "@/app/actions"
+import { FigmaViewer } from "@/components/markup/FigmaViewer"
 import { ProjectHeader } from "@/components/layout/ProjectHeader"
 import { useUser } from "@/lib/user-context"
 
@@ -27,6 +32,7 @@ interface ProjectClientProps {
     markups: Markup[]
     initialSelectedMarkup?: Markup
     initialComments: Comment[]
+    isGuest?: boolean
 }
 
 type Priority = 'high' | 'medium' | 'low'
@@ -58,23 +64,39 @@ export function ProjectClient({
     markups: initialMarkups,
     initialSelectedMarkup,
     initialComments,
+    isGuest = false,
 }: ProjectClientProps) {
     const user = useUser()
     const [markups, setMarkups] = useState<Markup[]>(initialMarkups)
     const [selectedMarkup, setSelectedMarkup] = useState<Markup | undefined>(initialSelectedMarkup)
     const [comments, setComments] = useState<Comment[]>(initialComments)
-    const [viewport, setViewport] = useState<"desktop" | "tablet" | "mobile">("desktop")
+    const [device, setDevice] = useState<DeviceKey>("desktop-1440")
+    const viewport = DEVICE_PRESETS[device].category  // coarse category, derived from the active preset
     const [mode, setMode] = useState<"browse" | "comment">("comment")
-    const [useProxy] = useState(true)
     const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number; scrollY?: number; scrollX?: number } | null>(null)
     const [hoveredComment, setHoveredComment] = useState<Comment | null>(null)
     const canvasRef = useRef<HTMLDivElement>(null)
 
-    // Track iframe scroll for anchoring pins to content
-    const [scrollState, setScrollState] = useState({ scrollY: 0, scrollX: 0 })
+    // View mode: live site / figma embed / side-by-side compare
+    const [viewMode, setViewMode] = useState<'live' | 'figma' | 'compare'>('live')
+
+    // Figma URL inline edit state
+    const [editingFigmaUrl, setEditingFigmaUrl] = useState(false)
+    const [figmaUrlInput, setFigmaUrlInput] = useState("")
+
+    // Track iframe scroll (includes viewport dimensions for accurate scroll anchoring)
+    const [scrollState, setScrollState] = useState({ scrollY: 0, scrollX: 0, viewportHeight: 0, viewportWidth: 0, documentHeight: 0 })
     const handleScrollChange = useCallback((scroll: ScrollState) => {
-        setScrollState({ scrollY: scroll.scrollY, scrollX: scroll.scrollX })
+        setScrollState({
+            scrollY: scroll.scrollY,
+            scrollX: scroll.scrollX,
+            viewportHeight: scroll.viewportHeight,
+            viewportWidth: scroll.viewportWidth,
+            documentHeight: scroll.documentHeight,
+        })
     }, [])
+    // Imperative handle to drive iframe scroll from the custom scrollbar.
+    const iframeHandleRef = useRef<IframeRendererHandle>(null)
 
     // Filters
     const [statusFilter, setStatusFilter] = useState<string | null>(null)
@@ -99,6 +121,10 @@ export function ProjectClient({
 
     // Zoom level (percentage)
     const [zoomLevel, setZoomLevel] = useState(100)
+
+    // Measured width of the canvas viewport — used to scale the fixed-size device
+    // frame down so it fits the available space (fit-to-width).
+    const [canvasWidth, setCanvasWidth] = useState(0)
 
     // ── Keyboard Shortcuts ──────────────────────────────────────────────────
     useEffect(() => {
@@ -135,6 +161,9 @@ export function ProjectClient({
         setSelectedMarkup(markup)
         setNewComment(null)
         setShowComments(true)
+        setViewMode('live')
+        setDevice(DEFAULT_DEVICE.desktop)
+        setScrollState({ scrollY: 0, scrollX: 0, viewportHeight: 0, viewportWidth: 0, documentHeight: 0 })
         const fetched = await getComments(markup.id)
         setComments(fetched)
     }
@@ -149,7 +178,7 @@ export function ProjectClient({
     const handleSaveComment = async (content: string, priority?: Priority) => {
         if (!newComment || !selectedMarkup) return
         const tempId = Math.random().toString(36).substring(7)
-        const authorName = user?.name || "Agency User"
+        const authorName = isGuest ? "Guest" : (user?.name || "Agency User")
         const optimistic: Comment = {
             id: tempId,
             markupId: selectedMarkup.id,
@@ -164,7 +193,9 @@ export function ProjectClient({
             createdAt: new Date().toISOString(),
             priority,
             status: 'open',
-            isGuest: false,
+            isGuest,
+            viewport,
+            device,
         }
         setComments(prev => [...prev, optimistic])
         setNewComment(null)
@@ -178,13 +209,31 @@ export function ProjectClient({
                 priority,
                 newComment.width,
                 newComment.height,
-                false,  // isGuest
+                isGuest,
                 newComment.scrollY,
-                newComment.scrollX
+                newComment.scrollX,
+                viewport,
+                device
             )
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch {
             setComments(prev => prev.filter(c => c.id !== tempId))
+        }
+    }
+
+    // ── Comment position update ─────────────────────────────────────────────
+    const handleMoveComment = async (commentId: string, newX: number, newY: number) => {
+        const newScrollY = scrollState.scrollY
+        const newScrollX = scrollState.scrollX
+        setComments(prev => prev.map(c => c.id === commentId
+            ? { ...c, x: newX, y: newY, scrollY: newScrollY, scrollX: newScrollX }
+            : c
+        ))
+        try {
+            await updateCommentPosition(commentId, newX, newY, newScrollY, newScrollX)
+        } catch {
+            const fetched = await getComments(selectedMarkup?.id ?? "")
+            setComments(fetched)
         }
     }
 
@@ -270,17 +319,82 @@ export function ProjectClient({
         }
     }
 
-    // ── Filtered comments ───────────────────────────────────────────────────
+    // ── Filtered comments — strict per-device-preset isolation ──────────────
     const visibleComments = comments.filter(c => {
+        const cDevice = c.device ?? DEFAULT_DEVICE[c.viewport ?? 'desktop']
+        const deviceMatch = cDevice === device
         const statusMatch = !statusFilter || (c.status ?? 'open') === statusFilter
         const priorityMatch = !priorityFilter || c.priority === priorityFilter
-        return statusMatch && priorityMatch
+        return deviceMatch && statusMatch && priorityMatch
     })
+
+    // Track the canvas width so we can fit the fixed-size frame to the available space.
+    useEffect(() => {
+        const el = canvasRef.current
+        if (!el) return
+        const update = () => setCanvasWidth(el.clientWidth)
+        update()
+        const ro = new ResizeObserver(update)
+        ro.observe(el)
+        return () => ro.disconnect()
+    }, [selectedMarkup?.id, viewMode, isFullscreen])
+
+    // Fixed logical size of the active device preset, and the scale needed to fit it.
+    const frameSize = { w: DEVICE_PRESETS[device].w, h: DEVICE_PRESETS[device].h }
+    const fitScale = canvasWidth > 0 ? Math.min(1, canvasWidth / frameSize.w) : 1
+    const effectiveScale = fitScale * (zoomLevel / 100)
 
     const fallbackImage = "https://placehold.co/1920x1080/png?text=Website+Screenshot"
 
+    // Shared scroll-adjusted comment pin renderer (passed as children into the renderers)
+    const renderCommentPins = () => {
+        const h = scrollState.viewportHeight || canvasRef.current?.clientHeight || 1
+        const w = scrollState.viewportWidth || canvasRef.current?.clientWidth || 1
+        return (
+            <div className="absolute inset-0 z-20 pointer-events-none">
+                {visibleComments.map((comment, i) => {
+                    const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
+                    const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
+                    const adjustedY = comment.y - dy
+                    const adjustedX = comment.x - dx
+                    if (adjustedY < -5 || adjustedY > 105) return null
+                    return (
+                        <div key={comment.id} className="pointer-events-auto">
+                            <CommentPin
+                                x={adjustedX}
+                                y={adjustedY}
+                                width={comment.width}
+                                height={comment.height}
+                                number={i + 1}
+                                author={comment.author}
+                                content={comment.content}
+                                priority={comment.priority}
+                                isHighlighted={hoveredComment?.id === comment.id}
+                                onMove={(newX, newY) => handleMoveComment(comment.id, newX, newY)}
+                            />
+                        </div>
+                    )
+                })}
+                {newComment && (
+                    <div className="pointer-events-auto">
+                        <CommentPin
+                            x={newComment.x}
+                            y={newComment.y}
+                            width={newComment.width}
+                            height={newComment.height}
+                            number={visibleComments.length + 1}
+                            isNew
+                            onSave={handleSaveComment}
+                            onCancel={() => setNewComment(null)}
+                        />
+                    </div>
+                )}
+            </div>
+        )
+    }
+
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-screen overflow-hidden">
             {/* Project Context Header with Canvas/Board Navigation - hidden in fullscreen */}
             {!isFullscreen && (
                 <ProjectHeader
@@ -293,6 +407,7 @@ export function ProjectClient({
             <div
                 className="grid flex-1 overflow-hidden"
                 style={{
+                    gridTemplateRows: "minmax(0, 1fr)",
                     gridTemplateColumns: isFullscreen
                         ? "1fr"
                         : showComments && selectedMarkup && mode === "comment"
@@ -302,7 +417,7 @@ export function ProjectClient({
             >
             {/* LEFT: Pages panel - hidden in fullscreen */}
             {!isFullscreen && (
-            <aside className="border-r border-border flex flex-col overflow-hidden bg-white">
+            <aside className="border-r border-border flex flex-col overflow-hidden bg-white min-h-0">
                 {/* Mode Toggle */}
                 <div className="p-5 border-b border-border flex-shrink-0">
                     <div className="font-mono text-[9px] font-semibold uppercase text-[#888888] mb-3">Mode</div>
@@ -336,9 +451,7 @@ export function ProjectClient({
                     <div className="flex flex-col gap-2">
                         {selectedMarkup ? (
                             <>
-                                <div className="font-mono text-[10px] text-[#888888] truncate bg-[#F5F5F5] px-2 py-1.5">
-                                    {typeof window !== 'undefined' ? `${window.location.origin}/share/${selectedMarkup.id}` : `/share/${selectedMarkup.id}`}
-                                </div>
+                                <div className="font-mono text-[9px] text-[#888888] mb-1">Page link</div>
                                 <button
                                     onClick={() => {
                                         const shareUrl = `${window.location.origin}/share/${selectedMarkup.id}`
@@ -352,16 +465,110 @@ export function ProjectClient({
                                             : "border-[#E0E0E0] bg-white text-[#050505] hover:bg-[#88FF66] hover:border-[#88FF66]"
                                     }`}
                                 >
-                                    {copied ? "✓ COPIED!" : "COPY GUEST LINK"}
+                                    {copied ? "✓ COPIED!" : "COPY PAGE LINK"}
+                                </button>
+                                <div className="font-mono text-[9px] text-[#888888] mt-1">Project link (all pages)</div>
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/share/project/${projectId}`
+                                        navigator.clipboard.writeText(url)
+                                        setCopied(true)
+                                        setTimeout(() => setCopied(false), 2000)
+                                    }}
+                                    className="font-mono text-[11px] font-semibold px-3 py-1.5 border transition-colors w-full border-[#E0E0E0] bg-white text-[#050505] hover:bg-[#88FF66] hover:border-[#88FF66]"
+                                >
+                                    COPY PROJECT LINK
                                 </button>
                             </>
                         ) : (
-                            <p className="font-mono text-[10px] text-[#888888] py-1.5">
-                                Select a page to share
-                            </p>
+                            <>
+                                <p className="font-mono text-[10px] text-[#888888] py-1.5">
+                                    Select a page to share
+                                </p>
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/share/project/${projectId}`
+                                        navigator.clipboard.writeText(url)
+                                        setCopied(true)
+                                        setTimeout(() => setCopied(false), 2000)
+                                    }}
+                                    className="font-mono text-[11px] font-semibold px-3 py-1.5 border transition-colors w-full border-[#E0E0E0] bg-white text-[#050505] hover:bg-[#88FF66] hover:border-[#88FF66]"
+                                >
+                                    COPY PROJECT LINK
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>
+
+                {/* Figma URL section — per selected page */}
+                {!isGuest && selectedMarkup && (
+                <div className="p-5 border-b border-border flex-shrink-0">
+                    <div className="font-mono text-[9px] font-semibold uppercase text-[#888888] mb-3">Figma Prototype</div>
+                    {editingFigmaUrl ? (
+                        <div className="flex flex-col gap-2">
+                            <input
+                                autoFocus
+                                type="url"
+                                value={figmaUrlInput}
+                                onChange={e => setFigmaUrlInput(e.target.value)}
+                                placeholder="https://www.figma.com/proto/..."
+                                className="w-full bg-transparent px-2 py-1.5 text-[10px] font-mono focus:outline-none border"
+                                style={{ borderColor: "#E0E0E0", color: "#050505" }}
+                                onKeyDown={async e => {
+                                    if (e.key === 'Enter') {
+                                        const updated = { ...selectedMarkup, figmaUrl: figmaUrlInput || undefined }
+                                        setSelectedMarkup(updated)
+                                        setMarkups(prev => prev.map(m => m.id === selectedMarkup.id ? updated : m))
+                                        setEditingFigmaUrl(false)
+                                        await updateMarkupFigmaUrl(selectedMarkup.id, figmaUrlInput || null)
+                                    }
+                                    if (e.key === 'Escape') { setEditingFigmaUrl(false) }
+                                }}
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={async () => {
+                                        const updated = { ...selectedMarkup, figmaUrl: figmaUrlInput || undefined }
+                                        setSelectedMarkup(updated)
+                                        setMarkups(prev => prev.map(m => m.id === selectedMarkup.id ? updated : m))
+                                        setEditingFigmaUrl(false)
+                                        await updateMarkupFigmaUrl(selectedMarkup.id, figmaUrlInput || null)
+                                    }}
+                                    className="flex-1 font-mono text-[11px] px-2 py-1 bg-[#050505] text-white border border-[#050505] hover:bg-[#333]"
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    onClick={() => setEditingFigmaUrl(false)}
+                                    className="font-mono text-[11px] px-2 py-1 border border-[#E0E0E0] text-[#888888] hover:text-[#050505]"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : selectedMarkup.figmaUrl ? (
+                        <div className="flex flex-col gap-2">
+                            <div className="font-mono text-[10px] text-[#888888] truncate bg-[#F5F5F5] px-2 py-1.5">
+                                {selectedMarkup.figmaUrl}
+                            </div>
+                            <button
+                                onClick={() => { setFigmaUrlInput(selectedMarkup.figmaUrl ?? ""); setEditingFigmaUrl(true) }}
+                                className="font-mono text-[11px] px-3 py-1 border border-[#E0E0E0] text-[#050505] hover:bg-[#F5F5F5] w-full"
+                            >
+                                [✎] Edit Figma URL
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={() => { setFigmaUrlInput(""); setEditingFigmaUrl(true) }}
+                            className="font-mono text-[11px] font-semibold px-3 py-1.5 border transition-colors w-full border-dashed border-[#E0E0E0] bg-white text-[#888888] hover:text-[#050505] hover:border-[#050505]"
+                        >
+                            + Add Figma Prototype URL
+                        </button>
+                    )}
+                </div>
+                )}
 
                 <div className="flex-1 overflow-y-auto p-5 flex flex-col gap-6">
                     {/* Pages list */}
@@ -425,7 +632,8 @@ export function ProjectClient({
                                                         </span>
                                                     )}
                                                 </button>
-                                                {/* Hover actions */}
+                                                {/* Hover actions — hidden for guests */}
+                                                {!isGuest && (
                                                 <div className="opacity-0 group-hover:opacity-100 flex gap-1 flex-shrink-0 transition-opacity">
                                                     <button
                                                         onClick={(e) => handleRenameStart(m, e)}
@@ -442,6 +650,7 @@ export function ProjectClient({
                                                         [×]
                                                     </button>
                                                 </div>
+                                                )}
                                             </>
                                         )}
                                     </div>
@@ -450,8 +659,8 @@ export function ProjectClient({
                         )}
                     </div>
 
-                    {/* Add page */}
-                    <CreateMarkupDialog onCreate={handleCreateMarkup} />
+                    {/* Add page — hidden for guests */}
+                    {!isGuest && <CreateMarkupDialog onCreate={handleCreateMarkup} />}
 
                     {/* Status filter */}
                     <div>
@@ -505,7 +714,7 @@ export function ProjectClient({
             )}
 
             {/* CENTER: Preview canvas */}
-            <section className="flex flex-col overflow-hidden bg-white">
+            <section className="flex flex-col overflow-hidden bg-white min-h-0">
                 {/* Toolbar */}
                 <div
                     className="h-12 flex items-center justify-between px-4 border-b flex-shrink-0"
@@ -513,30 +722,63 @@ export function ProjectClient({
                 >
                     {/* Left - Viewport selector & Zoom controls */}
                     <div className="flex items-center gap-3 font-mono text-[9px]" style={{ color: "#888888" }}>
-                        {/* Viewport selector buttons */}
+                        {/* Category tabs — each selects that category's default preset */}
                         <div className="flex items-center border" style={{ borderColor: "#E0E0E0" }}>
-                            {[
-                                { key: "desktop", label: "Desktop", size: "1440×900" },
-                                { key: "tablet", label: "Tab", size: "768×1024" },
-                                { key: "mobile", label: "Mobile", size: "390×844" },
-                            ].map(({ key, label, size }) => (
+                            {([
+                                { key: "desktop", label: "Desktop" },
+                                { key: "tablet", label: "Tab" },
+                                { key: "mobile", label: "Mobile" },
+                            ] as { key: 'desktop' | 'tablet' | 'mobile'; label: string }[]).map(({ key, label }) => (
                                 <button
                                     key={key}
-                                    onClick={() => setViewport(key as "desktop" | "tablet" | "mobile")}
+                                    onClick={() => { setDevice(DEFAULT_DEVICE[key]); setNewComment(null) }}
                                     className="px-2 py-1 transition-colors"
                                     style={{
                                         backgroundColor: viewport === key ? "#050505" : "#FFFFFF",
                                         color: viewport === key ? "#FFFFFF" : "#888888",
                                     }}
-                                    title={size}
                                 >
                                     {label}
                                 </button>
                             ))}
                         </div>
-                        <span style={{ color: "#888888", fontSize: "8px" }}>
-                            {viewport === "desktop" ? "1440×900" : viewport === "tablet" ? "768×1024" : "390×844"}
-                        </span>
+                        {/* Device-preset selector for the active category */}
+                        <select
+                            value={device}
+                            onChange={(e) => { setDevice(e.target.value as DeviceKey); setNewComment(null) }}
+                            className="border bg-white outline-none focus:border-[#050505] cursor-pointer"
+                            style={{ borderColor: "#E0E0E0", color: "#050505", fontSize: "9px", padding: "2px 4px" }}
+                            title="Device preset — comments are scoped to the selected preset"
+                        >
+                            {PRESETS_BY_CATEGORY[viewport].map((key) => (
+                                <option key={key} value={key}>
+                                    {DEVICE_PRESETS[key].label} ({DEVICE_PRESETS[key].w}×{DEVICE_PRESETS[key].h})
+                                </option>
+                            ))}
+                        </select>
+
+                        {/* Figma view mode toggle — only when Figma URL is set */}
+                        {selectedMarkup?.figmaUrl && (
+                            <div className="flex items-center border" style={{ borderColor: "#E0E0E0" }}>
+                                {([
+                                    { key: 'live', label: 'LIVE' },
+                                    { key: 'figma', label: 'FIGMA' },
+                                    { key: 'compare', label: 'COMPARE' },
+                                ] as { key: 'live' | 'figma' | 'compare'; label: string }[]).map(({ key, label }) => (
+                                    <button
+                                        key={key}
+                                        onClick={() => setViewMode(key)}
+                                        className="px-2 py-1 transition-colors"
+                                        style={{
+                                            backgroundColor: viewMode === key ? "#88FF66" : "#FFFFFF",
+                                            color: viewMode === key ? "#050505" : "#888888",
+                                        }}
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                         <button
                             onClick={() => setZoomLevel(prev => Math.max(25, prev - 25))}
                             className="w-5 h-5 flex items-center justify-center hover:bg-[#F5F5F5] transition-colors"
@@ -636,92 +878,118 @@ export function ProjectClient({
                                 backgroundSize: "20px 20px",
                             }}
                         >
-                            {/* Zoomable container */}
-                            <div
-                                className="relative origin-top-left transition-transform duration-200"
-                                style={{
-                                    transform: `scale(${zoomLevel / 100})`,
-                                    width: `${100 / (zoomLevel / 100)}%`,
-                                    height: `${100 / (zoomLevel / 100)}%`,
-                                }}
-                            >
-                            {/* Comment pins — only visible in comment mode, anchored to content */}
-                            {mode === "comment" && (
-                            <div className="absolute inset-0 z-20 pointer-events-none">
-                                {visibleComments.map((comment, i) => {
-                                    // Anchor pins to content by adjusting for scroll delta
-                                    const h = canvasRef.current?.clientHeight || 1
-                                    const w = canvasRef.current?.clientWidth || 1
-                                    const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
-                                    const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
-                                    const adjustedY = comment.y - dy
-                                    const adjustedX = comment.x - dx
-
-                                    // Hide if scrolled out of view
-                                    if (adjustedY < -5 || adjustedY > 105) return null
-
-                                    return (
-                                        <div key={comment.id} className="pointer-events-auto">
-                                            <CommentPin
-                                                x={adjustedX}
-                                                y={adjustedY}
-                                                width={comment.width}
-                                                height={comment.height}
-                                                number={i + 1}
-                                                author={comment.author}
-                                                content={comment.content}
-                                                priority={comment.priority}
-                                                isHighlighted={hoveredComment?.id === comment.id}
-                                            />
-                                        </div>
-                                    )
-                                })}
-                                {newComment && (
-                                    <div className="pointer-events-auto">
-                                        <CommentPin
-                                            x={newComment.x}
-                                            y={newComment.y}
-                                            width={newComment.width}
-                                            height={newComment.height}
-                                            number={visibleComments.length + 1}
-                                            isNew
-                                            onSave={handleSaveComment}
-                                            onCancel={() => setNewComment(null)}
-                                        />
-                                    </div>
-                                )}
-                            </div>
-                            )}
-
-                            {/* Renderer */}
-                            {selectedMarkup.type === "image" ? (
-                                <CanvasRenderer
-                                    imageUrl={selectedMarkup.url || fallbackImage}
-                                    mode={mode}
-                                    onCommentClick={handleCanvasClick}
-                                    highlightedComment={hoveredComment ? {
-                                        x: hoveredComment.x,
-                                        y: hoveredComment.y,
-                                        width: hoveredComment.width,
-                                        height: hoveredComment.height
-                                    } : null}
+                            {/* Renderer — switches between live / figma / compare view modes */}
+                            {viewMode === 'figma' && selectedMarkup.figmaUrl ? (
+                                <div className="absolute inset-0">
+                                    <FigmaViewer figmaUrl={selectedMarkup.figmaUrl} />
+                                </div>
+                            ) : viewMode === 'compare' && selectedMarkup.figmaUrl ? (
+                                <CompareSlider
+                                    left={
+                                        <>
+                                            {selectedMarkup.type === "image" ? (
+                                                <CanvasRenderer
+                                                    imageUrl={selectedMarkup.url || fallbackImage}
+                                                    mode={mode}
+                                                    onCommentClick={handleCanvasClick}
+                                                    highlightedComment={null}
+                                                >
+                                                    {mode === "comment" && renderCommentPins()}
+                                                </CanvasRenderer>
+                                            ) : (
+                                                <IframeRenderer
+                                                    url={`/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`}
+                                                    viewport={viewport}
+                                                    mode={mode}
+                                                    fit="fill"
+                                                    onCommentClick={handleCanvasClick}
+                                                    onScrollChange={handleScrollChange}
+                                                    highlightedComment={null}
+                                                >
+                                                    {mode === "comment" && renderCommentPins()}
+                                                </IframeRenderer>
+                                            )}
+                                            <div className="absolute top-2 left-2 z-30 font-mono text-[9px] px-2 py-1 bg-[#050505] text-white">LIVE</div>
+                                        </>
+                                    }
+                                    right={
+                                        <>
+                                            <FigmaViewer figmaUrl={selectedMarkup.figmaUrl} />
+                                            <div className="absolute top-2 right-2 z-30 font-mono text-[9px] px-2 py-1 bg-[#88FF66] text-[#050505]">FIGMA</div>
+                                        </>
+                                    }
                                 />
+                            ) : selectedMarkup.type === "image" ? (
+                                /* Images: keep the simple zoom container (static, self-centering) */
+                                <div
+                                    className="relative origin-top-left transition-transform duration-200"
+                                    style={{
+                                        transform: `scale(${zoomLevel / 100})`,
+                                        width: `${100 / (zoomLevel / 100)}%`,
+                                        height: `${100 / (zoomLevel / 100)}%`,
+                                    }}
+                                >
+                                    <CanvasRenderer
+                                        imageUrl={selectedMarkup.url || fallbackImage}
+                                        mode={mode}
+                                        onCommentClick={handleCanvasClick}
+                                        highlightedComment={hoveredComment ? {
+                                            x: hoveredComment.x,
+                                            y: hoveredComment.y,
+                                            width: hoveredComment.width,
+                                            height: hoveredComment.height
+                                        } : null}
+                                    >
+                                        {mode === "comment" && renderCommentPins()}
+                                    </CanvasRenderer>
+                                </div>
                             ) : (
-                                <IframeRenderer
-                                    url={`/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`}
-                                    viewport={viewport}
-                                    mode={mode}
-                                    onCommentClick={handleCanvasClick}
-                                    onScrollChange={handleScrollChange}
-                                    highlightedComment={hoveredComment ? {
-                                        x: hoveredComment.x,
-                                        y: hoveredComment.y,
-                                        width: hoveredComment.width,
-                                        height: hoveredComment.height
-                                    } : null}
-                                />
+                                /* Live website: fixed-size frame scaled to fit (keeps pins anchored) */
+                                <div className="min-h-full flex justify-center">
+                                    <div
+                                        style={{
+                                            width: `${frameSize.w * effectiveScale}px`,
+                                            height: `${frameSize.h * effectiveScale}px`,
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        <div
+                                            className="relative origin-top-left transition-transform duration-200"
+                                            style={{
+                                                width: `${frameSize.w}px`,
+                                                height: `${frameSize.h}px`,
+                                                transform: `scale(${effectiveScale})`,
+                                            }}
+                                        >
+                                            <IframeRenderer
+                                                ref={iframeHandleRef}
+                                                url={`/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`}
+                                                viewport={viewport}
+                                                mode={mode}
+                                                frameWidth={frameSize.w}
+                                                frameHeight={frameSize.h}
+                                                onCommentClick={handleCanvasClick}
+                                                onScrollChange={handleScrollChange}
+                                                highlightedComment={hoveredComment ? {
+                                                    x: hoveredComment.x,
+                                                    y: hoveredComment.y,
+                                                    width: hoveredComment.width,
+                                                    height: hoveredComment.height
+                                                } : null}
+                                            >
+                                                {mode === "comment" && renderCommentPins()}
+                                            </IframeRenderer>
+                                        </div>
+                                    </div>
+                                    {/* Custom draggable scrollbar (canvas-level, unscaled) */}
+                                    <CustomScrollbar
+                                        scrollY={scrollState.scrollY}
+                                        viewportHeight={scrollState.viewportHeight}
+                                        documentHeight={scrollState.documentHeight}
+                                        onScroll={(y) => iframeHandleRef.current?.scrollTo(y)}
+                                    />
+                                </div>
                             )}
-                            </div>
                         </div>
                     </div>
                 )}

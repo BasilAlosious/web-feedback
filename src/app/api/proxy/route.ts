@@ -73,6 +73,13 @@ export async function GET(request: NextRequest) {
         window.addEventListener('load', sendScrollPosition);
     }
 
+    // Re-send a few times after load. The parent's message listener may mount after
+    // our first send (race), and document height settles as fonts/images load — these
+    // resends ensure the parent reliably learns the document height (needed for the
+    // scrollbar to appear without the user scrolling first).
+    [100, 400, 1000, 2000, 3500].forEach(function(t) { setTimeout(sendScrollPosition, t); });
+    window.addEventListener('resize', sendScrollPosition, { passive: true });
+
     // Throttled scroll listener using requestAnimationFrame
     window.addEventListener('scroll', function() {
         if (!ticking) {

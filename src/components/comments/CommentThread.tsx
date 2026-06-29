@@ -1,6 +1,7 @@
 "use client"
 
 import { Comment } from "@/lib/db"
+import { DEVICE_PRESETS, type DeviceKey } from "@/components/markup/IframeRenderer"
 
 const STATUS_NEXT: Record<string, 'open' | 'in_progress' | 'resolved'> = {
     open: 'in_progress',
@@ -33,6 +34,18 @@ const PRIORITY_COLOR: Record<string, string> = {
     high:   'text-red-400',
     medium: 'text-yellow-400',
     low:    'text-muted-foreground',
+}
+
+const VIEWPORT_BADGE: Record<string, string> = {
+    desktop: '[WEB]',
+    tablet:  '[TAB]',
+    mobile:  '[MOB]',
+}
+
+const VIEWPORT_COLOR: Record<string, string> = {
+    desktop: '#4A9EFF',
+    tablet:  '#A855F7',
+    mobile:  '#F97316',
 }
 
 interface CommentThreadProps {
@@ -71,7 +84,7 @@ export function CommentThread({
     }
 
     return (
-        <div className="w-80 border-l h-full flex flex-col" style={{ backgroundColor: "#FFFFFF", borderColor: "#E0E0E0" }}>
+        <div className="w-80 border-l h-full flex flex-col min-h-0" style={{ backgroundColor: "#FFFFFF", borderColor: "#E0E0E0" }}>
             {/* Header */}
             <div
                 className="flex items-center justify-between flex-shrink-0 px-5 h-10"
@@ -90,7 +103,7 @@ export function CommentThread({
             </div>
 
             {/* Comments List */}
-            <div className="flex-1 overflow-y-auto p-5" style={{ backgroundColor: "#FFFFFF" }}>
+            <div className="flex-1 min-h-0 overflow-y-auto p-5" style={{ backgroundColor: "#FFFFFF" }}>
                 {comments.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-64 text-center">
                         <p className="font-mono text-[11px] uppercase" style={{ color: "#888888" }}>
@@ -134,6 +147,20 @@ export function CommentThread({
                                                     </span>
                                                 )}
                                             </span>
+                                            {comment.viewport && (
+                                                <span
+                                                    className="font-mono text-[9px] px-1 py-0.5"
+                                                    style={{
+                                                        color: VIEWPORT_COLOR[comment.viewport] ?? '#888888',
+                                                        backgroundColor: `${VIEWPORT_COLOR[comment.viewport] ?? '#888888'}18`,
+                                                    }}
+                                                    title={comment.device ? DEVICE_PRESETS[comment.device as DeviceKey]?.label : undefined}
+                                                >
+                                                    {(comment.device && DEVICE_PRESETS[comment.device as DeviceKey]?.label)
+                                                        || VIEWPORT_BADGE[comment.viewport]
+                                                        || comment.viewport.toUpperCase()}
+                                                </span>
+                                            )}
                                         </div>
 
                                         {/* Right: status toggle + time */}

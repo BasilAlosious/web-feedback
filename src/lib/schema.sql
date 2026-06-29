@@ -13,8 +13,12 @@ CREATE TABLE IF NOT EXISTS markups (
     url           TEXT NOT NULL,
     viewport      TEXT NOT NULL DEFAULT 'desktop',
     comment_count INTEGER NOT NULL DEFAULT 0,
-    type          TEXT NOT NULL DEFAULT 'website'
+    type          TEXT NOT NULL DEFAULT 'website',
+    figma_url     TEXT
 );
+
+-- Migration for existing databases
+ALTER TABLE markups ADD COLUMN IF NOT EXISTS figma_url TEXT;
 
 CREATE TABLE IF NOT EXISTS comments (
     id         TEXT PRIMARY KEY,
@@ -25,5 +29,11 @@ CREATE TABLE IF NOT EXISTS comments (
     author     TEXT NOT NULL,
     created_at TEXT NOT NULL,
     priority   TEXT,
-    status     TEXT NOT NULL DEFAULT 'open'
+    status     TEXT NOT NULL DEFAULT 'open',
+    viewport   TEXT NOT NULL DEFAULT 'desktop',
+    device     TEXT
 );
+
+-- Migration for existing databases
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS viewport TEXT NOT NULL DEFAULT 'desktop';
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS device TEXT;
