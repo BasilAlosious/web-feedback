@@ -6,7 +6,7 @@ import { MarkupToolbar } from "@/components/markup/MarkupToolbar"
 import { IframeRenderer, ScrollState, IframeRendererHandle, DEVICE_PRESETS, DEFAULT_DEVICE, type DeviceKey } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
 import { CustomScrollbar } from "@/components/markup/CustomScrollbar"
-import { Markup, Comment } from "@/lib/db"
+import { Markup, Comment, CommentAnchor } from "@/lib/db"
 import Link from "next/link"
 import { CommentPin } from "@/components/comments/CommentPin"
 import { CommentThread } from "@/components/comments/CommentThread"
@@ -32,7 +32,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
 
     // Comment state
     const [comments, setComments] = useState<Comment[]>(initialComments)
-    const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number; scrollY?: number; scrollX?: number } | null>(null)
+    const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number; scrollY?: number; scrollX?: number; anchor?: CommentAnchor | null } | null>(null)
     const [showThread, setShowThread] = useState(true)
     const [showShare, setShowShare] = useState(false)
 
@@ -87,9 +87,9 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
         localStorage.setItem('feedback_guest_name', name)
     }
 
-    const handleCanvasClick = (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number) => {
+    const handleCanvasClick = (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number, anchor?: CommentAnchor | null) => {
         if (mode === "comment") {
-            setNewComment({ x, y, width, height, scrollY, scrollX })
+            setNewComment({ x, y, width, height, scrollY, scrollX, anchor })
         }
     }
 
@@ -115,6 +115,7 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
             isGuest,
             viewport,
             device,
+            anchor: newComment.anchor ?? null,
         }
 
         setComments(prev => [...prev, optimisticComment])
@@ -135,7 +136,8 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                 newComment.scrollY,
                 newComment.scrollX,
                 viewport,
-                device
+                device,
+                newComment.anchor ?? null
             )
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch (error) {
@@ -302,13 +304,20 @@ export function MarkupClient({ markupId, projectId, initialData, initialComments
                                 {/* Comments - only visible in comment mode, anchored to content */}
                                 {mode === "comment" && (
                                     <div className="absolute inset-0 z-20 pointer-events-none">
-                                        {comments.filter(c => (c.device ?? DEFAULT_DEVICE[c.viewport ?? 'desktop']) === device).map((comment, i) => {
+                                        {comments.filter(c => c.anchor || (c.device ?? DEFAULT_DEVICE[c.viewport ?? 'desktop']) === device).map((comment, i) => {
                                             const h = scrollState.viewportHeight || containerRef.current?.clientHeight || 1
                                             const w = scrollState.viewportWidth || containerRef.current?.clientWidth || 1
-                                            const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
-                                            const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
-                                            const adjustedY = comment.y - dy
-                                            const adjustedX = comment.x - dx
+                                            let adjustedX: number
+                                            let adjustedY: number
+                                            if (comment.anchor) {
+                                                const res = iframeHandleRef.current?.resolveAnchor(comment.anchor)
+                                                if (!res || !res.visible) return null
+                                                adjustedX = res.xPct
+                                                adjustedY = res.yPct
+                                            } else {
+                                                adjustedX = comment.x - ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
+                                                adjustedY = comment.y - ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
+                                            }
 
                                             if (adjustedY < -5 || adjustedY > 105) return null
 

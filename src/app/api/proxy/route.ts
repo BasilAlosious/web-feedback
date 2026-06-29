@@ -66,6 +66,32 @@ export async function GET(request: NextRequest) {
         }, '*');
     }
 
+    // Stamp every element with a stable, deterministic id (document order) so the
+    // parent can anchor comments to specific elements. Re-stamped on DOM mutations.
+    function stampElementIds() {
+        var els = document.body ? document.body.getElementsByTagName('*') : [];
+        for (var i = 0; i < els.length; i++) {
+            els[i].setAttribute('data-fb-id', String(i));
+        }
+    }
+    function stampSoon() { try { stampElementIds(); } catch (e) {} }
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        stampSoon();
+    } else {
+        document.addEventListener('DOMContentLoaded', stampSoon);
+    }
+    window.addEventListener('load', stampSoon);
+    [200, 800, 2000].forEach(function(t) { setTimeout(stampSoon, t); });
+    // Re-stamp (debounced) when the DOM changes so ids stay in sync.
+    var stampTimer = null;
+    try {
+        var mo = new MutationObserver(function() {
+            if (stampTimer) clearTimeout(stampTimer);
+            stampTimer = setTimeout(stampSoon, 300);
+        });
+        if (document.body) mo.observe(document.body, { childList: true, subtree: true });
+    } catch (e) {}
+
     // Send initial position on load
     if (document.readyState === 'complete') {
         sendScrollPosition();

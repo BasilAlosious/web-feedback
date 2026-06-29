@@ -84,6 +84,7 @@ async function main() {
     // Migration: viewport + device per comment, figma_url per markup
     await client.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS viewport TEXT NOT NULL DEFAULT 'desktop'`)
     await client.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS device TEXT`)
+    await client.query(`ALTER TABLE comments ADD COLUMN IF NOT EXISTS anchor TEXT`)
     await client.query(`ALTER TABLE markups ADD COLUMN IF NOT EXISTS figma_url TEXT`)
 
     console.log('Tables created.')

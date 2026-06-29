@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { db, Project, Markup, Comment } from '@/lib/db'
+import { db, Project, Markup, Comment, CommentAnchor } from '@/lib/db'
 import { getCurrentUser } from '@/lib/auth'
 
 export async function createProject(formData: FormData) {
@@ -77,7 +77,8 @@ export async function addComment(
     scrollY?: number,
     scrollX?: number,
     viewport: 'desktop' | 'tablet' | 'mobile' = 'desktop',
-    device?: string
+    device?: string,
+    anchor?: CommentAnchor | null
 ) {
     const newComment: Comment = {
         id: Math.random().toString(36).substring(7),
@@ -96,6 +97,7 @@ export async function addComment(
         isGuest,
         viewport,
         device,
+        anchor: anchor ?? null,
     }
 
     await db.addComment(newComment)

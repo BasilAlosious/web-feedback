@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import Link from "next/link"
-import { Markup, Comment, Project } from "@/lib/db"
+import { Markup, Comment, Project, CommentAnchor } from "@/lib/db"
 import { IframeRenderer, ScrollState, IframeRendererHandle, DEVICE_PRESETS, DEFAULT_DEVICE, PRESETS_BY_CATEGORY, type DeviceKey } from "@/components/markup/IframeRenderer"
 import { CanvasRenderer } from "@/components/markup/CanvasRenderer"
 import { CustomScrollbar } from "@/components/markup/CustomScrollbar"
@@ -73,7 +73,7 @@ export function ProjectClient({
     const [device, setDevice] = useState<DeviceKey>("desktop-1440")
     const viewport = DEVICE_PRESETS[device].category  // coarse category, derived from the active preset
     const [mode, setMode] = useState<"browse" | "comment">("comment")
-    const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number; scrollY?: number; scrollX?: number } | null>(null)
+    const [newComment, setNewComment] = useState<{ x: number; y: number; width?: number; height?: number; scrollY?: number; scrollX?: number; anchor?: CommentAnchor | null } | null>(null)
     const [hoveredComment, setHoveredComment] = useState<Comment | null>(null)
     const canvasRef = useRef<HTMLDivElement>(null)
 
@@ -169,9 +169,9 @@ export function ProjectClient({
     }
 
     // ── Comment creation ────────────────────────────────────────────────────
-    const handleCanvasClick = (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number) => {
+    const handleCanvasClick = (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number, anchor?: CommentAnchor | null) => {
         if (mode === "comment") {
-            setNewComment({ x, y, width, height, scrollY, scrollX })
+            setNewComment({ x, y, width, height, scrollY, scrollX, anchor })
         }
     }
 
@@ -196,6 +196,7 @@ export function ProjectClient({
             isGuest,
             viewport,
             device,
+            anchor: newComment.anchor ?? null,
         }
         setComments(prev => [...prev, optimistic])
         setNewComment(null)
@@ -213,7 +214,8 @@ export function ProjectClient({
                 newComment.scrollY,
                 newComment.scrollX,
                 viewport,
-                device
+                device,
+                newComment.anchor ?? null
             )
             setComments(prev => prev.map(c => c.id === tempId ? saved : c))
         } catch {
@@ -319,13 +321,17 @@ export function ProjectClient({
         }
     }
 
-    // ── Filtered comments — strict per-device-preset isolation ──────────────
+    // ── Filtered comments ───────────────────────────────────────────────────
+    // Element-anchored comments follow their element across presets (shown wherever
+    // it resolves; the renderer hides them when the element is absent at this size).
+    // Point/area comments stay strictly scoped to the preset they were made on.
     const visibleComments = comments.filter(c => {
-        const cDevice = c.device ?? DEFAULT_DEVICE[c.viewport ?? 'desktop']
-        const deviceMatch = cDevice === device
         const statusMatch = !statusFilter || (c.status ?? 'open') === statusFilter
         const priorityMatch = !priorityFilter || c.priority === priorityFilter
-        return deviceMatch && statusMatch && priorityMatch
+        if (!statusMatch || !priorityMatch) return false
+        if (c.anchor) return true
+        const cDevice = c.device ?? DEFAULT_DEVICE[c.viewport ?? 'desktop']
+        return cDevice === device
     })
 
     // Track the canvas width so we can fit the fixed-size frame to the available space.
@@ -353,10 +359,18 @@ export function ProjectClient({
         return (
             <div className="absolute inset-0 z-20 pointer-events-none">
                 {visibleComments.map((comment, i) => {
-                    const dy = ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
-                    const dx = ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
-                    const adjustedY = comment.y - dy
-                    const adjustedX = comment.x - dx
+                    let adjustedX: number
+                    let adjustedY: number
+                    if (comment.anchor) {
+                        // Element-anchored: resolve the pin from the element's live rect.
+                        const res = iframeHandleRef.current?.resolveAnchor(comment.anchor)
+                        if (!res || !res.visible) return null  // element absent/hidden at this size
+                        adjustedX = res.xPct
+                        adjustedY = res.yPct
+                    } else {
+                        adjustedX = comment.x - ((scrollState.scrollX - (comment.scrollX ?? 0)) / w) * 100
+                        adjustedY = comment.y - ((scrollState.scrollY - (comment.scrollY ?? 0)) / h) * 100
+                    }
                     if (adjustedY < -5 || adjustedY > 105) return null
                     return (
                         <div key={comment.id} className="pointer-events-auto">
@@ -370,7 +384,7 @@ export function ProjectClient({
                                 content={comment.content}
                                 priority={comment.priority}
                                 isHighlighted={hoveredComment?.id === comment.id}
-                                onMove={(newX, newY) => handleMoveComment(comment.id, newX, newY)}
+                                onMove={comment.anchor ? undefined : (newX, newY) => handleMoveComment(comment.id, newX, newY)}
                             />
                         </div>
                     )

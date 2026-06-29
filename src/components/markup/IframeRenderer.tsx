@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useImperativeHandle, forwardRef, ReactNode } from "react"
 import { cn } from "@/lib/utils"
+import type { CommentAnchor } from "@/lib/db"
 
 export interface ScrollState {
     scrollY: number
@@ -12,16 +13,26 @@ export interface ScrollState {
     viewportWidth: number
 }
 
-// Imperative handle so parents can drive the iframe's scroll (e.g. a custom scrollbar).
+// Result of resolving an anchor against the current DOM, in frame-% coords.
+export interface AnchorResolution {
+    xPct: number
+    yPct: number
+    visible: boolean       // false when the element exists but is hidden/zero-size
+}
+
+// Imperative handle so parents can drive the iframe's scroll (e.g. a custom scrollbar)
+// and resolve / capture element anchors for comments.
 export interface IframeRendererHandle {
     scrollTo: (scrollY: number, scrollX?: number, smooth?: boolean) => void
+    pickElementAtPct: (xPct: number, yPct: number) => CommentAnchor | null
+    resolveAnchor: (anchor: CommentAnchor) => AnchorResolution | null
 }
 
 interface IframeRendererProps {
     url: string
     viewport: "desktop" | "tablet" | "mobile"
     mode: "browse" | "comment"
-    onCommentClick?: (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number) => void
+    onCommentClick?: (x: number, y: number, width?: number, height?: number, scrollY?: number, scrollX?: number, anchor?: CommentAnchor | null) => void
     highlightedComment?: { x: number; y: number; width?: number; height?: number; scrollY?: number } | null
     children?: ReactNode  // Comment pins to render inside
     onScrollChange?: (scroll: ScrollState) => void  // Callback when iframe scrolls
@@ -84,6 +95,55 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
     const [isDragging, setIsDragging] = useState(false)
     const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null)
     const [dragCurrent, setDragCurrent] = useState<{ x: number; y: number } | null>(null)
+    // Inspect-mode hover highlight box, in frame-% coords.
+    const [hoverBox, setHoverBox] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
+
+    // Same-origin (via proxy) access to the iframe document. Returns null if unavailable.
+    const getDoc = useCallback((): Document | null => {
+        try { return iframeRef.current?.contentDocument ?? null } catch { return null }
+    }, [])
+
+    // Capture an element anchor from a frame-% point (the click location).
+    const pickElementAtPct = useCallback((xPct: number, yPct: number): CommentAnchor | null => {
+        const doc = getDoc()
+        const iframe = iframeRef.current
+        if (!doc || !iframe) return null
+        const w = iframe.clientWidth || 1
+        const h = iframe.clientHeight || 1
+        const xCss = (xPct / 100) * w
+        const yCss = (yPct / 100) * h
+        const el = doc.elementFromPoint(xCss, yCss) as HTMLElement | null
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        return {
+            fbId: el.getAttribute('data-fb-id') ?? undefined,
+            relX: r.width ? (xCss - r.left) / r.width : 0.5,
+            relY: r.height ? (yCss - r.top) / r.height : 0.5,
+            tag: el.tagName.toLowerCase(),
+            elId: el.id || undefined,
+            cls: (typeof el.className === 'string' ? el.className : '').trim().slice(0, 120) || undefined,
+            text: (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 60) || undefined,
+        }
+    }, [getDoc])
+
+    // Resolve an anchor against the current DOM → frame-% position (or hidden).
+    const resolveAnchor = useCallback((anchor: CommentAnchor): AnchorResolution | null => {
+        const doc = getDoc()
+        const iframe = iframeRef.current
+        if (!doc || !iframe) return null
+        let el: HTMLElement | null = null
+        if (anchor.fbId != null) el = doc.querySelector(`[data-fb-id="${anchor.fbId}"]`)
+        if (!el && anchor.elId) el = doc.getElementById(anchor.elId)
+        if (!el) return null
+        const r = el.getBoundingClientRect()
+        const w = iframe.clientWidth || 1
+        const h = iframe.clientHeight || 1
+        // Hidden / zero-size element → exists but not visible at this size.
+        if (r.width === 0 && r.height === 0) return { xPct: 0, yPct: 0, visible: false }
+        const xCss = r.left + (anchor.relX ?? 0.5) * r.width
+        const yCss = r.top + (anchor.relY ?? 0.5) * r.height
+        return { xPct: (xCss / w) * 100, yPct: (yCss / h) * 100, visible: true }
+    }, [getDoc])
 
     // Track iframe scroll position via postMessage from injected script
     const [iframeScroll, setIframeScroll] = useState<ScrollState>({
@@ -127,10 +187,12 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
         }, '*')
     }, [])
 
-    // Expose scroll control to parent (used by the custom scrollbar).
+    // Expose scroll control + anchor helpers to the parent.
     useImperativeHandle(ref, () => ({
         scrollTo: (scrollY: number, scrollX: number = 0, smooth: boolean = false) => scrollIframeTo(scrollY, scrollX, smooth),
-    }), [scrollIframeTo])
+        pickElementAtPct,
+        resolveAnchor,
+    }), [scrollIframeTo, pickElementAtPct, resolveAnchor])
 
     // Forward wheel events from overlay to iframe
     const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -164,10 +226,38 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
         setIsDragging(true)
     }
 
+    // Inspect-style hover: outline the element under the cursor (frame-% coords).
+    const updateHover = (clientX: number, clientY: number) => {
+        const doc = getDoc()
+        const iframe = iframeRef.current
+        const overlay = overlayRef.current
+        if (!doc || !iframe || !overlay) return
+        const rect = overlay.getBoundingClientRect()
+        const w = iframe.clientWidth || 1
+        const h = iframe.clientHeight || 1
+        const scaleX = rect.width / w
+        const scaleY = rect.height / h
+        if (!scaleX || !scaleY) return
+        const xCss = (clientX - rect.left) / scaleX
+        const yCss = (clientY - rect.top) / scaleY
+        const el = doc.elementFromPoint(xCss, yCss) as HTMLElement | null
+        if (!el) { setHoverBox(null); return }
+        const r = el.getBoundingClientRect()
+        setHoverBox({
+            x: (r.left / w) * 100,
+            y: (r.top / h) * 100,
+            w: (r.width / w) * 100,
+            h: (r.height / h) * 100,
+        })
+    }
+
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isDragging || !dragStart) return
-        const pos = toPercentage(e.clientX, e.clientY)
-        setDragCurrent(pos)
+        if (isDragging && dragStart) {
+            setDragCurrent(toPercentage(e.clientX, e.clientY))
+            setHoverBox(null)  // suppress hover outline while dragging an area
+        } else {
+            updateHover(e.clientX, e.clientY)
+        }
     }
 
     const handleMouseUp = () => {
@@ -187,8 +277,9 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
         const distance = Math.sqrt(Math.pow(endPx.x - startPx.x, 2) + Math.pow(endPx.y - startPx.y, 2))
 
         if (distance < MIN_DRAG_DISTANCE) {
-            // Simple click - point comment with scroll position
-            onCommentClick(dragStart.x, dragStart.y, undefined, undefined, iframeScroll.scrollY, iframeScroll.scrollX)
+            // Simple click - point comment, anchored to the element under the cursor
+            const anchor = pickElementAtPct(dragStart.x, dragStart.y)
+            onCommentClick(dragStart.x, dragStart.y, undefined, undefined, iframeScroll.scrollY, iframeScroll.scrollX, anchor)
         } else {
             // Drag - area comment with scroll position
             const x = Math.min(dragStart.x, dragCurrent.x)
@@ -227,6 +318,7 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
                     onMouseMove={handleMouseMove}
                     onMouseUp={handleMouseUp}
                     onMouseLeave={() => {
+                        setHoverBox(null)
                         if (isDragging) {
                             setIsDragging(false)
                             setDragStart(null)
@@ -234,6 +326,21 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
                         }
                     }}
                     onWheel={handleWheel}
+                />
+            )}
+
+            {/* Inspect-mode hover outline — the element a click would anchor to */}
+            {mode === "comment" && hoverBox && !isDragging && (
+                <div
+                    className="absolute z-20 border pointer-events-none"
+                    style={{
+                        left: `${hoverBox.x}%`,
+                        top: `${hoverBox.y}%`,
+                        width: `${hoverBox.w}%`,
+                        height: `${hoverBox.h}%`,
+                        borderColor: "#4A9EFF",
+                        backgroundColor: "rgba(74, 158, 255, 0.12)",
+                    }}
                 />
             )}
 

@@ -24,6 +24,17 @@ export interface Markup {
     figmaUrl?: string
 }
 
+// Anchors a comment to a specific DOM element so the pin follows it across reflow.
+export interface CommentAnchor {
+    fbId?: string   // data-fb-id stamped by the proxy script
+    relX: number    // 0–1 offset within the element's box
+    relY: number
+    tag?: string
+    elId?: string
+    cls?: string
+    text?: string
+}
+
 export interface Comment {
     id: string
     markupId: string
@@ -41,6 +52,7 @@ export interface Comment {
     isGuest?: boolean  // true for guest comments via share links
     viewport: 'desktop' | 'tablet' | 'mobile'  // coarse category (for badge/back-compat)
     device?: string  // exact device-preset key (e.g. 'desktop-1990'); scopes the comment
+    anchor?: CommentAnchor | null  // optional element anchor (pin follows the element)
 }
 
 export interface User {
@@ -63,6 +75,13 @@ const DEFAULT_DEVICE_BY_VIEWPORT: Record<string, string> = {
 function withCommentDefaults(c: Comment): Comment {
     const viewport = c.viewport ?? 'desktop'
     return { ...c, viewport, device: c.device ?? DEFAULT_DEVICE_BY_VIEWPORT[viewport] ?? 'desktop-1440' }
+}
+
+// Postgres returns `anchor` as a JSON string (TEXT column) — parse it to an object.
+function parseCommentRow(row: any): Comment {
+    let anchor = row.anchor
+    if (typeof anchor === 'string') { try { anchor = JSON.parse(anchor) } catch { anchor = null } }
+    return { ...row, anchor: anchor ?? null } as Comment
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -179,7 +198,7 @@ function postgresDb() {
     const SU = `id, email, name, password_hash AS "passwordHash", created_at AS "createdAt"`
     const SP = `id, user_id AS "userId", name, url, markup_count AS "markupCount", updated_at AS "updatedAt"`
     const SM = `id, project_id AS "projectId", name, url, viewport, comment_count AS "commentCount", type, figma_url AS "figmaUrl"`
-    const SC = `id, markup_id AS "markupId", x, y, width, height, scroll_y AS "scrollY", scroll_x AS "scrollX", content, author, created_at AS "createdAt", priority, status, is_guest AS "isGuest", COALESCE(viewport, 'desktop') AS viewport, COALESCE(device, CASE COALESCE(viewport,'desktop') WHEN 'tablet' THEN 'ipad' WHEN 'mobile' THEN 'iphone-16' ELSE 'desktop-1440' END) AS device`
+    const SC = `id, markup_id AS "markupId", x, y, width, height, scroll_y AS "scrollY", scroll_x AS "scrollX", content, author, created_at AS "createdAt", priority, status, is_guest AS "isGuest", COALESCE(viewport, 'desktop') AS viewport, COALESCE(device, CASE COALESCE(viewport,'desktop') WHEN 'tablet' THEN 'ipad' WHEN 'mobile' THEN 'iphone-16' ELSE 'desktop-1440' END) AS device, anchor`
 
     return {
         // User methods
@@ -254,13 +273,13 @@ function postgresDb() {
             const { rows } = await sql.query(
                 `SELECT ${SC} FROM comments WHERE markup_id = $1 ORDER BY created_at ASC`, [markupId]
             )
-            return rows as Comment[]
+            return rows.map(parseCommentRow)
         },
 
         addComment: async (c: Comment): Promise<Comment> => {
-            await sql`INSERT INTO comments (id, markup_id, x, y, width, height, scroll_y, scroll_x, content, author, created_at, priority, status, is_guest, viewport, device)
+            await sql`INSERT INTO comments (id, markup_id, x, y, width, height, scroll_y, scroll_x, content, author, created_at, priority, status, is_guest, viewport, device, anchor)
                       VALUES (${c.id}, ${c.markupId}, ${c.x}, ${c.y}, ${c.width ?? null}, ${c.height ?? null}, ${c.scrollY ?? null}, ${c.scrollX ?? null}, ${c.content}, ${c.author},
-                              ${c.createdAt}, ${c.priority ?? null}, ${c.status ?? 'open'}, ${c.isGuest ?? false}, ${c.viewport ?? 'desktop'}, ${c.device ?? null})`
+                              ${c.createdAt}, ${c.priority ?? null}, ${c.status ?? 'open'}, ${c.isGuest ?? false}, ${c.viewport ?? 'desktop'}, ${c.device ?? null}, ${c.anchor ? JSON.stringify(c.anchor) : null})`
             await sql`UPDATE markups SET comment_count = comment_count + 1 WHERE id = ${c.markupId}`
             return c
         },
@@ -275,7 +294,7 @@ function postgresDb() {
             if (patch.viewport !== undefined) await sql`UPDATE comments SET viewport = ${patch.viewport ?? 'desktop'} WHERE id = ${id}`
             const { rows } = await sql.query(`SELECT ${SC} FROM comments WHERE id = $1`, [id])
             if (!rows[0]) throw new Error('Comment not found')
-            return rows[0] as Comment
+            return parseCommentRow(rows[0])
         },
 
         getCommentsForProject: async (projectId: string): Promise<Comment[]> => {

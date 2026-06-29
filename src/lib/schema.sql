@@ -31,9 +31,11 @@ CREATE TABLE IF NOT EXISTS comments (
     priority   TEXT,
     status     TEXT NOT NULL DEFAULT 'open',
     viewport   TEXT NOT NULL DEFAULT 'desktop',
-    device     TEXT
+    device     TEXT,
+    anchor     TEXT
 );
 
 -- Migration for existing databases
 ALTER TABLE comments ADD COLUMN IF NOT EXISTS viewport TEXT NOT NULL DEFAULT 'desktop';
 ALTER TABLE comments ADD COLUMN IF NOT EXISTS device TEXT;
+ALTER TABLE comments ADD COLUMN IF NOT EXISTS anchor TEXT;
