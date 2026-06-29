@@ -9,9 +9,9 @@ export async function createProject(formData: FormData) {
     if (!user) return { error: 'Not authenticated' }
 
     const title = formData.get('title') as string
-    const url = formData.get('url') as string
+    const url = (formData.get('url') as string) || ''
 
-    if (!title || !url) return { error: 'Missing fields' }
+    if (!title) return { error: 'Missing fields' }
 
     const newProject: Project = {
         id: Math.random().toString(36).substring(7),

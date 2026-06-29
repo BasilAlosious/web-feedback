@@ -892,117 +892,121 @@ export function ProjectClient({
                                 backgroundSize: "20px 20px",
                             }}
                         >
-                            {/* Renderer — switches between live / figma / compare view modes */}
-                            {viewMode === 'figma' && selectedMarkup.figmaUrl ? (
-                                <div className="absolute inset-0">
+                            {/* Persistent layers — iframes stay mounted so switching
+                                LIVE / FIGMA / COMPARE never reloads them. */}
+
+                            {/* LIVE layer (in-flow; hidden via display when not active) */}
+                            <div className="w-full h-full" style={{ display: viewMode === 'live' ? undefined : 'none' }}>
+                                {selectedMarkup.type === "image" ? (
+                                    /* Images: simple zoom container (static, self-centering) */
+                                    <div
+                                        className="relative origin-top-left transition-transform duration-200"
+                                        style={{
+                                            transform: `scale(${zoomLevel / 100})`,
+                                            width: `${100 / (zoomLevel / 100)}%`,
+                                            height: `${100 / (zoomLevel / 100)}%`,
+                                        }}
+                                    >
+                                        <CanvasRenderer
+                                            imageUrl={selectedMarkup.url || fallbackImage}
+                                            mode={mode}
+                                            onCommentClick={handleCanvasClick}
+                                            highlightedComment={hoveredComment ? {
+                                                x: hoveredComment.x,
+                                                y: hoveredComment.y,
+                                                width: hoveredComment.width,
+                                                height: hoveredComment.height
+                                            } : null}
+                                        >
+                                            {mode === "comment" && renderCommentPins()}
+                                        </CanvasRenderer>
+                                    </div>
+                                ) : (
+                                    /* Live website: fixed-size frame scaled to fit (keeps pins anchored) */
+                                    <div className="min-h-full flex justify-center">
+                                        <div
+                                            style={{
+                                                width: `${frameSize.w * effectiveScale}px`,
+                                                height: `${frameSize.h * effectiveScale}px`,
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            <div
+                                                className="relative origin-top-left transition-transform duration-200"
+                                                style={{
+                                                    width: `${frameSize.w}px`,
+                                                    height: `${frameSize.h}px`,
+                                                    transform: `scale(${effectiveScale})`,
+                                                }}
+                                            >
+                                                <IframeRenderer
+                                                    ref={iframeHandleRef}
+                                                    url={`/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`}
+                                                    viewport={viewport}
+                                                    mode={mode}
+                                                    frameWidth={frameSize.w}
+                                                    frameHeight={frameSize.h}
+                                                    onCommentClick={handleCanvasClick}
+                                                    onScrollChange={handleScrollChange}
+                                                    highlightedComment={hoveredComment ? {
+                                                        x: hoveredComment.x,
+                                                        y: hoveredComment.y,
+                                                        width: hoveredComment.width,
+                                                        height: hoveredComment.height
+                                                    } : null}
+                                                >
+                                                    {mode === "comment" && renderCommentPins()}
+                                                </IframeRenderer>
+                                            </div>
+                                        </div>
+                                        {/* Custom draggable scrollbar (canvas-level, unscaled) */}
+                                        <CustomScrollbar
+                                            scrollY={scrollState.scrollY}
+                                            viewportHeight={scrollState.viewportHeight}
+                                            documentHeight={scrollState.documentHeight}
+                                            onScroll={(y) => iframeHandleRef.current?.scrollTo(y)}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* FIGMA layer — always mounted (no reload): full in FIGMA, base in COMPARE, hidden in LIVE */}
+                            {selectedMarkup.figmaUrl && (
+                                <div className="absolute inset-0" style={{ display: viewMode === 'live' ? 'none' : 'block' }}>
                                     <FigmaViewer figmaUrl={selectedMarkup.figmaUrl} />
+                                    {viewMode === 'figma' && (
+                                        <div className="absolute top-2 right-2 z-30 font-mono text-[9px] px-2 py-1 bg-[#88FF66] text-[#050505]">FIGMA</div>
+                                    )}
                                 </div>
-                            ) : viewMode === 'compare' && selectedMarkup.figmaUrl ? (
+                            )}
+
+                            {/* COMPARE overlay — clipped live over a transparent base, so the persistent Figma layer shows through */}
+                            {viewMode === 'compare' && selectedMarkup.figmaUrl && (
                                 <CompareSlider
                                     left={
                                         <>
                                             {selectedMarkup.type === "image" ? (
                                                 <CanvasRenderer
                                                     imageUrl={selectedMarkup.url || fallbackImage}
-                                                    mode={mode}
-                                                    onCommentClick={handleCanvasClick}
+                                                    mode="browse"
                                                     highlightedComment={null}
-                                                >
-                                                    {mode === "comment" && renderCommentPins()}
-                                                </CanvasRenderer>
+                                                />
                                             ) : (
                                                 <IframeRenderer
                                                     url={`/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`}
                                                     viewport={viewport}
-                                                    mode={mode}
+                                                    mode="browse"
                                                     fit="fill"
-                                                    onCommentClick={handleCanvasClick}
-                                                    onScrollChange={handleScrollChange}
                                                     highlightedComment={null}
-                                                >
-                                                    {mode === "comment" && renderCommentPins()}
-                                                </IframeRenderer>
+                                                />
                                             )}
                                             <div className="absolute top-2 left-2 z-30 font-mono text-[9px] px-2 py-1 bg-[#050505] text-white">LIVE</div>
                                         </>
                                     }
                                     right={
-                                        <>
-                                            <FigmaViewer figmaUrl={selectedMarkup.figmaUrl} />
-                                            <div className="absolute top-2 right-2 z-30 font-mono text-[9px] px-2 py-1 bg-[#88FF66] text-[#050505]">FIGMA</div>
-                                        </>
+                                        <div className="absolute top-2 right-2 z-30 font-mono text-[9px] px-2 py-1 bg-[#88FF66] text-[#050505]">FIGMA</div>
                                     }
                                 />
-                            ) : selectedMarkup.type === "image" ? (
-                                /* Images: keep the simple zoom container (static, self-centering) */
-                                <div
-                                    className="relative origin-top-left transition-transform duration-200"
-                                    style={{
-                                        transform: `scale(${zoomLevel / 100})`,
-                                        width: `${100 / (zoomLevel / 100)}%`,
-                                        height: `${100 / (zoomLevel / 100)}%`,
-                                    }}
-                                >
-                                    <CanvasRenderer
-                                        imageUrl={selectedMarkup.url || fallbackImage}
-                                        mode={mode}
-                                        onCommentClick={handleCanvasClick}
-                                        highlightedComment={hoveredComment ? {
-                                            x: hoveredComment.x,
-                                            y: hoveredComment.y,
-                                            width: hoveredComment.width,
-                                            height: hoveredComment.height
-                                        } : null}
-                                    >
-                                        {mode === "comment" && renderCommentPins()}
-                                    </CanvasRenderer>
-                                </div>
-                            ) : (
-                                /* Live website: fixed-size frame scaled to fit (keeps pins anchored) */
-                                <div className="min-h-full flex justify-center">
-                                    <div
-                                        style={{
-                                            width: `${frameSize.w * effectiveScale}px`,
-                                            height: `${frameSize.h * effectiveScale}px`,
-                                            flexShrink: 0,
-                                        }}
-                                    >
-                                        <div
-                                            className="relative origin-top-left transition-transform duration-200"
-                                            style={{
-                                                width: `${frameSize.w}px`,
-                                                height: `${frameSize.h}px`,
-                                                transform: `scale(${effectiveScale})`,
-                                            }}
-                                        >
-                                            <IframeRenderer
-                                                ref={iframeHandleRef}
-                                                url={`/api/proxy?url=${encodeURIComponent(selectedMarkup.url)}`}
-                                                viewport={viewport}
-                                                mode={mode}
-                                                frameWidth={frameSize.w}
-                                                frameHeight={frameSize.h}
-                                                onCommentClick={handleCanvasClick}
-                                                onScrollChange={handleScrollChange}
-                                                highlightedComment={hoveredComment ? {
-                                                    x: hoveredComment.x,
-                                                    y: hoveredComment.y,
-                                                    width: hoveredComment.width,
-                                                    height: hoveredComment.height
-                                                } : null}
-                                            >
-                                                {mode === "comment" && renderCommentPins()}
-                                            </IframeRenderer>
-                                        </div>
-                                    </div>
-                                    {/* Custom draggable scrollbar (canvas-level, unscaled) */}
-                                    <CustomScrollbar
-                                        scrollY={scrollState.scrollY}
-                                        viewportHeight={scrollState.viewportHeight}
-                                        documentHeight={scrollState.documentHeight}
-                                        onScroll={(y) => iframeHandleRef.current?.scrollTo(y)}
-                                    />
-                                </div>
                             )}
                         </div>
                     </div>

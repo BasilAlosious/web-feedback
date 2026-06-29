@@ -103,6 +103,21 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
         try { return iframeRef.current?.contentDocument ?? null } catch { return null }
     }, [])
 
+    // Whether an element is a meaningful anchor target. Empty page areas resolve to
+    // <body>/<html> or a full-page wrapper — anchoring/highlighting those would
+    // "select the whole canvas", which we don't want.
+    const isAnchorable = useCallback((el: HTMLElement | null, w: number, h: number): boolean => {
+        if (!el) return false
+        const tag = el.tagName
+        if (tag === 'BODY' || tag === 'HTML') return false
+        const doc = getDoc()
+        if (doc && el === doc.documentElement) return false
+        const r = el.getBoundingClientRect()
+        // Reject elements that span ~the whole frame (page background / top wrapper).
+        if (r.width >= w * 0.99 && r.height >= h * 0.99) return false
+        return true
+    }, [getDoc])
+
     // Capture an element anchor from a frame-% point (the click location).
     const pickElementAtPct = useCallback((xPct: number, yPct: number): CommentAnchor | null => {
         const doc = getDoc()
@@ -113,7 +128,7 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
         const xCss = (xPct / 100) * w
         const yCss = (yPct / 100) * h
         const el = doc.elementFromPoint(xCss, yCss) as HTMLElement | null
-        if (!el) return null
+        if (!el || !isAnchorable(el, w, h)) return null
         const r = el.getBoundingClientRect()
         return {
             fbId: el.getAttribute('data-fb-id') ?? undefined,
@@ -241,7 +256,7 @@ export const IframeRenderer = forwardRef<IframeRendererHandle, IframeRendererPro
         const xCss = (clientX - rect.left) / scaleX
         const yCss = (clientY - rect.top) / scaleY
         const el = doc.elementFromPoint(xCss, yCss) as HTMLElement | null
-        if (!el) { setHoverBox(null); return }
+        if (!el || !isAnchorable(el, w, h)) { setHoverBox(null); return }
         const r = el.getBoundingClientRect()
         setHoverBox({
             x: (r.left / w) * 100,
